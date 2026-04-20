@@ -1,6 +1,3 @@
-# Local dependencies / nested repos
-CLIProxyAPIPlus/
-
 # Temporary workspace files
 tmp/
 .cache/

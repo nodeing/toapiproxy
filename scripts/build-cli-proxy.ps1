@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$cliProjectDir = Join-Path $repoRoot "CLIProxyAPIPlus"
+$cliProjectDir = Join-Path $repoRoot "tmp\CLIProxyAPIPlus"
 $resolvedTarget = if ($Target) { $Target } else { "x86_64-pc-windows-msvc" }
 $binaryName = "cli-proxy-api-plus.exe"
 $outputPath = Join-Path $repoRoot ("src-tauri\resources\" + $binaryName)
@@ -110,7 +110,7 @@ try {
         -o $tempOutputPath `
         .\cmd\server
     if ($LASTEXITCODE -ne 0) {
-        throw "CLIProxyAPIPlus build failed. Ensure the installed Go toolchain satisfies CLIProxyAPIPlus/go.mod."
+        throw "CLIProxyAPIPlus build failed. Ensure the installed Go toolchain satisfies tmp/CLIProxyAPIPlus/go.mod."
     }
 } finally {
     Pop-Location

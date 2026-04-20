@@ -25,7 +25,7 @@ EOF
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-cli_project_dir="$repo_root/CLIProxyAPIPlus"
+cli_project_dir="$repo_root/tmp/CLIProxyAPIPlus"
 resources_dir="$repo_root/src-tauri/resources"
 go_cache_root="$repo_root/.cache/go"
 go_build_cache="$go_cache_root/build"
