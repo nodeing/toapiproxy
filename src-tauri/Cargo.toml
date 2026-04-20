@@ -1,0 +1,49 @@
+[package]
+name = "app"
+version = "1.0.0"
+description = "A Tauri App"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# 在 Windows release 模式下隐藏控制台窗口
+[profile.release]
+lto = true
+
+[[bin]]
+name = "app"
+path = "src/main.rs"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.3", features = [] }
+
+[dependencies]
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.9.5", features = ["tray-icon"] }
+tauri-plugin-log = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-single-instance = "2"
+dirs = "5.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+chrono = "0.4"
+notify = "6.1"
+notify-debouncer-mini = "0.4"
+arboard = "3.4"
+uuid = { version = "1.10", features = ["v4", "v5"] }
+regex = "1.10"
+sha2 = "0.10"

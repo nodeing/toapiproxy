@@ -1,0 +1,16 @@
+# Local dependencies / nested repos
+CLIProxyAPIPlus/
+
+# Temporary workspace files
+tmp/
+.cache/
+
+# Build outputs
+build/
+src-tauri/target/
+
+# Frontend dependencies
+node_modules/
+
+# Editor files
+.vscode/

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOAPIPROXY</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="codex-overrides.css">
+    <link rel="stylesheet" href="services-overrides.css">
+    <link rel="stylesheet" href="claude-providers.css">
+</head>
+<body>
+    <div id="app">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <img src="assets/icon.png" alt="TOAPIPROXY" class="logo">
+                <h1>TOAPIPROXY</h1>
+            </div>
+            <ul class="nav-list">
+                <li class="nav-item active" data-tab="general">
+                    <span class="icon">&#9881;</span>
+                    <span>&#24120;&#35268;</span>
+                </li>
+                <li class="nav-item" data-tab="services">
+                    <span class="icon">&#9729;</span>
+                    <span>&#26381;&#21153;</span>
+                </li>
+                <li class="nav-item" data-tab="accounts">
+                    <span class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9.5" cy="7" r="3"></circle>
+                            <path d="M20 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M14 4.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </span>
+                    <span>&#36134;&#25143;</span>
+                </li>
+                <li class="nav-item" data-tab="config">
+                    <span class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="21" y1="4" x2="14" y2="4"></line>
+                            <line x1="10" y1="4" x2="3" y2="4"></line>
+                            <line x1="21" y1="12" x2="12" y2="12"></line>
+                            <line x1="8" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="20" x2="16" y2="20"></line>
+                            <line x1="12" y1="20" x2="3" y2="20"></line>
+                            <circle cx="12" cy="4" r="2"></circle>
+                            <circle cx="10" cy="12" r="2"></circle>
+                            <circle cx="14" cy="20" r="2"></circle>
+                        </svg>
+                    </span>
+                    <span>&#37197;&#32622;</span>
+                </li>
+                <li class="nav-item" data-tab="about">
+                    <span class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M12 10v6"></path>
+                            <path d="M12 7h.01"></path>
+                        </svg>
+                    </span>
+                    <span>&#20851;&#20110;</span>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="content">
+            <section id="general" class="tab-content active">
+                <h2>&#24120;&#35268;&#35774;&#32622;</h2>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>服务器状态</h3>
+                        <span class="port-info">端口 8317</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-row">
+                            <div class="status-indicator" id="server-status">
+                                <span class="status-dot stopped"></span>
+                                <span class="status-text">已停止</span>
+                            </div>
+                            <button id="toggle-server" class="btn btn-primary">启动服务器</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>设置</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="setting-row">
+                            <label>
+                                <input type="checkbox" id="launch-at-login">
+                                <span>开机自启动</span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <span>服务地址</span>
+                            <button id="copy-url" class="btn btn-secondary">复制地址</button>
+                        </div>
+                        <div class="setting-row">
+                            <span>认证文件夹</span>
+                            <button id="open-auth-folder" class="btn btn-secondary">打开文件夹</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>服务日志</h3>
+                        <button id="clear-logs" class="btn btn-small">清空</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="log-container" class="log-container">
+                            <div class="log-empty">暂无日志</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="services" class="tab-content">
+                <h2>&#26381;&#21153;&#31649;&#29702;</h2>
+                <div class="services-grid" id="services-grid">
+                    <!-- Services will be rendered by JS -->
+                </div>
+            </section>
+
+            <section id="accounts" class="tab-content">
+                <h2>&#36134;&#25143;&#31649;&#29702;</h2>
+                <div class="page-toolbar">
+                    <div class="page-tabs" id="accounts-page-tabs">
+                        <button class="page-tab active" data-page-group="accounts" data-page-target="codex">Codex</button>
+                    </div>
+                    <div class="page-toolbar-actions">
+                        <button id="refresh-codex-usage" class="btn btn-secondary">&#21047;&#26032;&#29992;&#37327;</button>
+                        <div class="dropdown" style="position: relative; display: inline-block;">
+                            <button id="add-codex-account" class="btn btn-primary">&#28155;&#21152;&#36134;&#25143; &#9660;</button>
+                            <div id="codex-add-dropdown" class="dropdown-content" style="display: none; position: absolute; right: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; min-width: 180px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                <a href="#" id="codex-login-openai" style="display: block; padding: 12px 16px; color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--border);">Login with OpenAI</a>
+                                <a href="#" id="codex-import-current" style="display: block; padding: 12px 16px; color: var(--text-primary); text-decoration: none;">Import Current Codex</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="accounts-pane-codex" class="page-pane active" data-page-group="accounts" data-page-pane="codex">
+                    <div id="codex-accounts-list" class="accounts-list">
+                        <!-- Codex accounts will be rendered by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <section id="config" class="tab-content">
+                <h2>&#26234;&#33021;&#20307;&#37197;&#32622;</h2>
+                <div class="page-toolbar">
+                    <div class="page-tabs" id="config-page-tabs">
+                        <button class="page-tab active" data-page-group="config" data-page-target="claude">Claude</button>
+                        <button class="page-tab" data-page-group="config" data-page-target="droid">Droid</button>
+                    </div>
+                    <div class="page-toolbar-actions providers-page-actions">
+                        <div class="page-toolbar-actions-pane active" data-page-group="config" data-page-pane-actions="claude">
+                            <button id="refresh-claude-providers" class="btn btn-secondary">&#21047;&#26032;</button>
+                            <button id="add-claude-provider" class="btn btn-primary">&#26032;&#22686;&#37197;&#32622;&#26723;&#26696;</button>
+                        </div>
+                        <div class="page-toolbar-actions-pane" data-page-group="config" data-page-pane-actions="droid">
+                            <button id="refresh-droid-models" class="btn btn-secondary">&#21047;&#26032;</button>
+                            <button id="add-droid-model" class="btn btn-primary">&#26032;&#22686;&#27169;&#22411;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="config-pane-claude" class="page-pane active" data-page-group="config" data-page-pane="claude">
+                    <div id="claude-providers-notice" class="provider-inline-notice" style="display: none;"></div>
+                    <div id="claude-providers-list" class="provider-list">
+                        <!-- Claude providers will be rendered by JS -->
+                    </div>
+                </div>
+                <div id="config-pane-droid" class="page-pane" data-page-group="config" data-page-pane="droid">
+                    <div id="droid-models-notice" class="provider-inline-notice" style="display: none;"></div>
+                    <div id="droid-models-list" class="provider-list">
+                        <!-- Droid models will be rendered by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <section id="about" class="tab-content">
+                <div class="about-content">
+                    <img src="assets/icon.png" alt="TOAPIPROXY" class="about-logo">
+                    <h2>TOAPIPROXY</h2>
+                    <p class="version">v1.0.0</p>
+                    <p class="description">一个本地AI API代理服务 仅供个人学习使用</p>
+                    <p class="copyright">&copy; 2026 TOAPIPROXY</p>
+                        <p class="about-link-row">
+                            <a
+                                id="about-tutorial-link"
+                                class="about-link"
+                                href="https://bokecity.com/book/95?from=free"
+                            >使用教程</a>
+                        </p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="main.js" defer></script>
+    <script src="codex-overrides.js" defer></script>
+    <script src="services-overrides.js" defer></script>
+    <script src="claude-providers.js" defer></script>
+    <script src="droid-models.js" defer></script>
+</body>
+</html>
+
