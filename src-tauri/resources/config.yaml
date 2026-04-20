@@ -1,0 +1,89 @@
+# TOAPIPROXY bundled runtime configuration template
+#
+# This file is packaged with the desktop app and copied to the user's local
+# app data directory on first launch. Do not put any real upstream API keys or
+# tokens in this template.
+
+port: 8318
+
+# Bind management and backend traffic to localhost only.
+host: "127.0.0.1"
+
+# Use the default per-user auth directory instead of a machine-specific path.
+auth-dir: "~/.cli-proxy-api"
+
+# Client auth keys for the proxy itself. Keep empty in the packaged template.
+api-keys: []
+
+debug: false
+incognito-browser: true
+logging-to-file: false
+usage-statistics-enabled: true
+request-retry: 3
+max-retry-interval: 30
+
+quota-exceeded:
+  switch-project: true
+  switch-preview-model: true
+
+remote-management:
+  allow-remote: false
+  # This is the app's built-in localhost-only management key. It is not an
+  # upstream service credential and is hashed into the user's local config on first run.
+  secret-key: "toapiproxy-local-dev"
+  disable-control-panel: true
+
+oauth-model-alias:
+  github-copilot:
+    - name: claude-haiku-4.5
+      alias: claude-haiku-4-5
+      fork: true
+    - name: claude-opus-4.1
+      alias: claude-opus-4-1
+      fork: true
+    - name: claude-opus-4.5
+      alias: claude-opus-4-5
+      fork: true
+    - name: claude-opus-4.6
+      alias: claude-opus-4-6
+      fork: true
+    - name: claude-sonnet-4.5
+      alias: claude-sonnet-4-5
+      fork: true
+    - name: claude-sonnet-4.6
+      alias: claude-sonnet-4-6
+      fork: true
+  kiro:
+    - name: kiro-claude-sonnet-4-6
+      alias: claude-sonnet-4-6
+      fork: true
+    - name: kiro-claude-sonnet-4-5
+      alias: claude-sonnet-4-5-20250929
+      fork: true
+    - name: kiro-claude-sonnet-4-5
+      alias: claude-sonnet-4-5
+      fork: true
+    - name: kiro-claude-sonnet-4
+      alias: claude-sonnet-4-20250514
+      fork: true
+    - name: kiro-claude-sonnet-4
+      alias: claude-sonnet-4
+      fork: true
+    - name: kiro-claude-opus-4-6
+      alias: claude-opus-4-6
+      fork: true
+    - name: kiro-claude-opus-4-5
+      alias: claude-opus-4-5-20251101
+      fork: true
+    - name: kiro-claude-opus-4-5
+      alias: claude-opus-4-5
+      fork: true
+    - name: kiro-claude-haiku-4-5
+      alias: claude-haiku-4-5-20251001
+      fork: true
+    - name: kiro-claude-haiku-4-5
+      alias: claude-haiku-4-5
+      fork: true
+
+# Upstream credentials must remain empty in the packaged template.
+codex-api-key: []
