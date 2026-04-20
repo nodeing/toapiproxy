@@ -282,7 +282,7 @@ else
   ensure_rust_target_installed "$target_triple"
 fi
 
-"$script_dir/build-cli-proxy.sh" --target "$target_triple"
+bash "$script_dir/build-cli-proxy.sh" --target "$target_triple"
 
 cargo_args=(tauri build --ci)
 if [[ -n "$target_triple" ]]; then
