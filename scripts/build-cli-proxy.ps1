@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$cliProjectDir = Join-Path $repoRoot "tmp\CLIProxyAPIPlus"
+$cliProjectDir = Join-Path $repoRoot "third_party\CLIProxyAPIPlus"
 $resolvedTarget = if ($Target) { $Target } else { "x86_64-pc-windows-msvc" }
 $binaryName = "cli-proxy-api-plus.exe"
 $outputPath = Join-Path $repoRoot ("src-tauri\resources\" + $binaryName)
@@ -63,6 +63,42 @@ function Stop-RunningBinaryProcesses {
     }
 }
 
+function Get-CLIProxyAPIPlusCommit {
+    param(
+        [string]$RepoRoot
+    )
+
+    $subtreePath = "third_party/CLIProxyAPIPlus"
+
+    try {
+        $subtreeMessage = git -C $RepoRoot log `
+            --format=%B `
+            -n 1 `
+            --grep "git-subtree-dir: $subtreePath" `
+            --fixed-strings 2>$null
+
+        foreach ($line in ($subtreeMessage -split "`r?`n")) {
+            if ($line -like "git-subtree-split:*") {
+                $splitCommit = ($line -replace '^git-subtree-split:\s*', "").Trim()
+                if ($splitCommit) {
+                    return $splitCommit.Substring(0, [Math]::Min(8, $splitCommit.Length))
+                }
+            }
+        }
+    } catch {
+    }
+
+    try {
+        $pathCommit = (git -C $RepoRoot log -1 --format=%h -- $subtreePath 2>$null).Trim()
+        if ($pathCommit) {
+            return $pathCommit
+        }
+    } catch {
+    }
+
+    return "workspace"
+}
+
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
     throw "go command not found. Install Go before building CLIProxyAPIPlus."
 }
@@ -74,11 +110,7 @@ if (-not (Test-Path $cliProjectDir)) {
 New-Item -ItemType Directory -Force (Split-Path -Parent $outputPath) | Out-Null
 
 $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
-$commit = "workspace"
-try {
-    $commit = (git -C $cliProjectDir rev-parse --short HEAD 2>$null).Trim()
-} catch {
-}
+$commit = Get-CLIProxyAPIPlusCommit -RepoRoot $repoRoot
 
 $env:CGO_ENABLED = "0"
 $env:GOTOOLCHAIN = "local"
@@ -110,7 +142,7 @@ try {
         -o $tempOutputPath `
         .\cmd\server
     if ($LASTEXITCODE -ne 0) {
-        throw "CLIProxyAPIPlus build failed. Ensure the installed Go toolchain satisfies tmp/CLIProxyAPIPlus/go.mod."
+        throw "CLIProxyAPIPlus build failed. Ensure the installed Go toolchain satisfies third_party/CLIProxyAPIPlus/go.mod."
     }
 } finally {
     Pop-Location

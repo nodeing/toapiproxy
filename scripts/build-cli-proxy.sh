@@ -25,7 +25,7 @@ EOF
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-cli_project_dir="$repo_root/tmp/CLIProxyAPIPlus"
+cli_project_dir="$repo_root/third_party/CLIProxyAPIPlus"
 resources_dir="$repo_root/src-tauri/resources"
 go_cache_root="$repo_root/.cache/go"
 go_build_cache="$go_cache_root/build"
@@ -62,6 +62,33 @@ require_command() {
     echo "Required command not found: $1" >&2
     exit 1
   fi
+}
+
+resolve_cli_proxy_commit() {
+  local subtree_path="third_party/CLIProxyAPIPlus"
+  local subtree_message
+  local split_commit
+  local path_commit
+
+  if ! command -v git >/dev/null 2>&1; then
+    printf 'workspace'
+    return 0
+  fi
+
+  subtree_message="$(git -C "$repo_root" log --format=%B -n 1 --grep="git-subtree-dir: $subtree_path" --fixed-strings 2>/dev/null || true)"
+  split_commit="$(printf '%s\n' "$subtree_message" | awk '/^git-subtree-split:/ { print $2; exit }')"
+  if [[ -n "$split_commit" ]]; then
+    printf '%.8s' "$split_commit"
+    return 0
+  fi
+
+  path_commit="$(git -C "$repo_root" log -1 --format=%h -- "$subtree_path" 2>/dev/null || true)"
+  if [[ -n "$path_commit" ]]; then
+    printf '%s' "$path_commit"
+    return 0
+  fi
+
+  printf 'workspace'
 }
 
 detect_host_target() {
@@ -184,10 +211,7 @@ output_path="${output_path:-$resources_dir/cli-proxy-api-plus}"
 mkdir -p "$resources_dir" "$go_build_cache" "$go_mod_cache" "$artifact_dir"
 
 build_date="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-commit="workspace"
-if command -v git >/dev/null 2>&1; then
-  commit="$(git -C "$cli_project_dir" rev-parse --short HEAD 2>/dev/null || echo workspace)"
-fi
+commit="$(resolve_cli_proxy_commit)"
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/toapiproxy-cli-build.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT

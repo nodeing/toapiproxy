@@ -203,7 +203,9 @@ TOAPIPROXY/
 │   ├── Cargo.toml            # Rust 依赖
 │   └── tauri.conf.json       # Tauri 配置
 ├── tmp/
-│   └── CLIProxyAPIPlus/      # 代理核心 (Go)
+│   └── CLIProxyAPIPlus/      # 临时文件
+├── third_party/
+│   └── CLIProxyAPIPlus/      # 代理核心 (Go subtree)
 ├── scripts/                  # 构建脚本
 ├── package.json
 └── Makefile
