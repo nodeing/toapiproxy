@@ -122,6 +122,15 @@
     font-weight: 700;
 }
 
+.provider-index-avatar {
+    background: rgba(115, 184, 255, 0.12);
+    border-color: rgba(115, 184, 255, 0.14);
+    color: #cfe5ff;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
 .provider-meta {
     min-width: 0;
     flex: 1;

@@ -148,7 +148,7 @@
         );
     }
 
-    function renderProfileCard(profile) {
+    function renderProfileCard(profile, index) {
         const buttons = [];
 
         buttons.push(
@@ -169,8 +169,8 @@
             (profile.enabled ? ' is-current' : ' is-disabled') +
             '">' +
                 '<div class="provider-card-main">' +
-                    '<div class="provider-avatar">' +
-                        escapeHtmlValue(getProfileInitial(profile.name)) +
+                    '<div class="provider-avatar provider-index-avatar">' +
+                        escapeHtmlValue(index + 1) +
                     '</div>' +
                     '<div class="provider-meta">' +
                         '<div class="provider-card-topline">' +
@@ -571,7 +571,11 @@
             return;
         }
 
-        const confirmed = confirm('确定删除配置档案“' + profile.name + '”吗？');
+        const confirmed = await window.appConfirm({
+            title: '删除配置档案',
+            message: '确定删除配置档案“' + profile.name + '”吗？',
+            confirmText: '删除'
+        });
         if (!confirmed) {
             return;
         }

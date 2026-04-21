@@ -5,12 +5,12 @@
     var visibleServiceIds = ['codex'];
 
     var serviceIcons = {
-        claude: '&#129302;',
-        codex: '&#128187;',
-        gemini: '&#10024;',
-        copilot: '&#128640;',
-        qwen: '&#127760;',
-        antigravity: '&#127756;',
+        claude: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 18.6 7v10L12 20.8 5.4 17V7L12 3.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><path d="M12 7.8 15.8 10v4L12 16.2 8.2 14v-4L12 7.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path></svg>',
+        codex: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5.5" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect><path d="M8 18.5h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M10 14.5v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M14 14.5v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>',
+        gemini: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.8 8.2 18.5 10 13.8 11.8 12 16.5 10.2 11.8 5.5 10 10.2 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path></svg>',
+        copilot: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 15.5c-1.9 0-3.5-1.6-3.5-3.5S5.6 8.5 7.5 8.5c.7-2 2.6-3.3 4.8-3.3 2.8 0 5.2 2.3 5.2 5.2v.3c1.4.3 2.5 1.6 2.5 3.1 0 1.8-1.4 3.2-3.2 3.2H7.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><path d="M9 12h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>',
+        qwen: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="M16.5 16.5 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M9.5 12.5 11.3 14.3 15 10.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+        antigravity: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8.5c0-1.9 1.6-3.5 3.5-3.5 1.1 0 2.1.5 2.8 1.4.4-.2.9-.4 1.4-.4 1.7 0 3.1 1.4 3.1 3.1v.3c1.3.4 2.2 1.6 2.2 3 0 1.8-1.4 3.2-3.2 3.2H9.2C7.4 15.6 6 14.2 6 12.4c0-1.7 1.2-3.2 3-3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
     };
 
     var serviceHelp = {

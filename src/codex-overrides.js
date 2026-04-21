@@ -29,29 +29,29 @@ var loadCodexAccounts;
     }
 
     function formatCodexCredits(balance, unlimited) {
-        if (unlimited) return 'Credits Unlimited';
+        if (unlimited) return '额度不限';
         if (balance === null || balance === undefined || Number.isNaN(Number(balance))) return '';
-        return `Credits ${Number(balance).toFixed(2)}`;
+        return `额度 ${Number(balance).toFixed(2)}`;
     }
 
     function formatCodexDateTime(value) {
-        if (!value) return 'Unknown';
+        if (!value) return '未知';
 
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return escapeHtml(String(value));
 
-        const datePart = new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: 'numeric',
+        const datePart = new Intl.DateTimeFormat('zh-CN', {
             year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
         }).format(date);
-        const timePart = new Intl.DateTimeFormat('en-US', {
+        const timePart = new Intl.DateTimeFormat('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',
             hour12: false,
         }).format(date);
 
-        return `${datePart} at ${timePart}`;
+        return `${datePart} ${timePart}`;
     }
 
     function formatMinuteCountdown(resetAt) {
@@ -61,15 +61,15 @@ var loadCodexAccounts;
         if (Number.isNaN(resetDate.getTime())) return '';
 
         const diffMs = resetDate.getTime() - Date.now();
-        if (diffMs <= 0) return 'Resets soon';
+        if (diffMs <= 0) return '即将重置';
 
         const remainingMinutes = Math.max(1, Math.ceil(diffMs / 60000));
-        return `Resets in ${remainingMinutes} min`;
+        return `${remainingMinutes} 分钟后重置`;
     }
 
     function formatResetDays(days) {
         if (days === null || days === undefined) return '';
-        return `Resets in ${days} day${days === 1 ? '' : 's'}`;
+        return `${days} 天后重置`;
     }
 
     function formatResetSummary(window, label) {
@@ -89,14 +89,15 @@ var loadCodexAccounts;
         const usedPercent = Math.min(window.usedPercent || 0, 100);
         const remainingPercent = window.remainingPercent ?? Math.max(0, 100 - usedPercent);
         const resetAtText = formatCodexDateTime(window.resetAt);
-        const updatedAtText = options.updatedAt ? `Updated ${formatCodexDateTime(options.updatedAt)}` : '';
+        const updatedAtText = options.updatedAt ? `更新于 ${formatCodexDateTime(options.updatedAt)}` : '';
         const resetSummary = formatResetSummary(window, label);
+        const localizedLabel = label === '5h' ? '5 小时限额' : label === 'Weekly' ? '周限额' : label;
 
         return `
             <div class="codex-usage-section">
                 <div class="codex-usage-header">
-                    <span class="codex-usage-label">${escapeHtml(label)}</span>
-                    <span class="codex-usage-used ${usageClass}">Used ${usedPercent}%</span>
+                    <span class="codex-usage-label">${escapeHtml(localizedLabel)}</span>
+                    <span class="codex-usage-used ${usageClass}">已使用 ${usedPercent}%</span>
                 </div>
                 <div class="codex-usage-meta">
                     <span></span>
@@ -106,7 +107,7 @@ var loadCodexAccounts;
                     <div class="usage-fill ${usageClass}" style="width: ${usedPercent}%"></div>
                 </div>
                 <div class="codex-usage-footer">
-                    <span>Remaining ${remainingPercent}%</span>
+                    <span>剩余 ${remainingPercent}%</span>
                 </div>
                 ${updatedAtText || resetSummary ? `
                     <div class="codex-usage-extra">
@@ -118,8 +119,17 @@ var loadCodexAccounts;
         `;
     }
 
+    function updateCodexAccountCount() {
+        const badge = document.getElementById('codex-account-count');
+        if (badge) {
+            badge.textContent = String(codexKeys.length);
+        }
+    }
+
     function renderCodexCards() {
         if (!codexAccountsList) return;
+
+        updateCodexAccountCount();
 
         if (!codexKeys.length) {
             codexAccountsList.innerHTML = `
@@ -169,7 +179,7 @@ var loadCodexAccounts;
             return `
                 <div class="account-card codex-account-card">
                     <div class="account-header codex-account-header">
-                        <span class="account-icon codex-account-icon">&#128187;</span>
+                        <span class="account-icon codex-account-icon codex-account-index">${index + 1}</span>
                         <div class="account-info">
                             <div class="codex-title-row">
                                 <div class="account-email">${escapeHtml(title)}</div>
@@ -218,7 +228,12 @@ var loadCodexAccounts;
     };
 
     window.deleteCodexKey = async function (accountRef) {
-        if (!confirm('确定要删除这个 Codex 账户吗？')) return;
+        const confirmed = await window.appConfirm({
+            title: '删除 Codex 账户',
+            message: '确定要删除这个 Codex 账户吗？',
+            confirmText: '删除'
+        });
+        if (!confirmed) return;
         try {
             await invoke('delete_codex_account', { accountRef });
             addLog('Codex account deleted');

@@ -178,7 +178,7 @@
         );
     }
 
-    function renderModelCard(modelConfig) {
+    function renderModelCard(modelConfig, index) {
         const buttons = [];
         buttons.push(
             renderActionButton(
@@ -195,8 +195,8 @@
         return (
             '<div class="provider-card' + (modelConfig.isCurrent ? ' is-current' : '') + '">' +
                 '<div class="provider-card-main">' +
-                    '<div class="provider-avatar">' +
-                        escapeHtmlValue(getModelInitial(modelConfig)) +
+                    '<div class="provider-avatar provider-index-avatar">' +
+                        escapeHtmlValue(index + 1) +
                     '</div>' +
                     '<div class="provider-meta">' +
                         '<div class="provider-card-topline">' +
@@ -537,12 +537,14 @@
             return;
         }
 
-        const confirmed = confirm(
-            '确定删除 Droid 自定义模型“' +
-            modelConfig.displayName +
-            '”吗？' +
-            (modelConfig.isCurrent ? ' 这是当前默认模型，删除后会清空默认模型引用。' : '')
-        );
+        const confirmed = await window.appConfirm({
+            title: '删除 Droid 自定义模型',
+            message: '确定删除 Droid 自定义模型“' +
+                modelConfig.displayName +
+                '”吗？' +
+                (modelConfig.isCurrent ? ' 这是当前默认模型，删除后会清空默认模型引用。' : ''),
+            confirmText: '删除'
+        });
         if (!confirmed) {
             return;
         }

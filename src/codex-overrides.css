@@ -38,10 +38,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 26px;
     border-radius: 12px;
     background: rgba(115, 184, 255, 0.12);
     box-shadow: inset 0 0 0 1px rgba(115, 184, 255, 0.14);
+}
+
+.codex-account-index {
+    font-size: 18px;
+    font-weight: 800;
+    color: #cfe5ff;
+    letter-spacing: 0.02em;
 }
 
 .codex-title-row {

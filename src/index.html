@@ -14,7 +14,7 @@
         <nav class="sidebar">
             <div class="sidebar-header">
                 <img src="assets/icon.png" alt="TOAPIPROXY" class="logo">
-                <h1>TOAPIPROXY</h1>
+                <h1>ToAPI Proxy</h1>
             </div>
             <ul class="nav-list">
                 <li class="nav-item active" data-tab="general">
@@ -131,7 +131,10 @@
                 <h2>&#36134;&#25143;&#31649;&#29702;</h2>
                 <div class="page-toolbar">
                     <div class="page-tabs" id="accounts-page-tabs">
-                        <button class="page-tab active" data-page-group="accounts" data-page-target="codex">Codex</button>
+                        <button class="page-tab active page-tab-with-badge" data-page-group="accounts" data-page-target="codex">
+                            <span>Codex</span>
+                            <span class="page-tab-badge" id="codex-account-count">0</span>
+                        </button>
                     </div>
                     <div class="page-toolbar-actions">
                         <button id="refresh-codex-usage" class="btn btn-secondary">&#21047;&#26032;&#29992;&#37327;</button>
@@ -188,10 +191,10 @@
             <section id="about" class="tab-content">
                 <div class="about-content">
                     <img src="assets/icon.png" alt="TOAPIPROXY" class="about-logo">
-                    <h2>TOAPIPROXY</h2>
-                    <p class="version">v1.0.0</p>
+                    <h2>ToAPI Proxy</h2>
+                    <p class="version">v0.1.0</p>
                     <p class="description">一个本地AI API代理服务 仅供个人学习使用</p>
-                    <p class="copyright">&copy; 2026 TOAPIPROXY</p>
+                    <p class="copyright">&copy; 2026 ToAPI Proxy</p>
                         <p class="about-link-row">
                             <a
                                 id="about-tutorial-link"
@@ -202,6 +205,23 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <div id="confirm-modal" class="provider-modal confirm-modal" aria-hidden="true">
+        <div class="provider-modal-backdrop" data-confirm-close="cancel"></div>
+        <div class="provider-modal-panel confirm-modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+            <div class="provider-modal-header">
+                <div>
+                    <div class="provider-modal-title" id="confirm-modal-title">确认操作</div>
+                    <p class="confirm-modal-message" id="confirm-modal-message">确定继续吗？</p>
+                </div>
+                <button type="button" class="btn btn-secondary provider-modal-close" id="confirm-modal-close">&times;</button>
+            </div>
+            <div class="confirm-modal-actions">
+                <button type="button" class="btn btn-secondary" id="confirm-modal-cancel">取消</button>
+                <button type="button" class="btn btn-primary confirm-modal-confirm" id="confirm-modal-confirm">确认</button>
+            </div>
+        </div>
     </div>
 
     <script src="main.js" defer></script>

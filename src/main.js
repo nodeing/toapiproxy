@@ -49,6 +49,12 @@ const logContainer = document.getElementById('log-container');
 const servicesGrid = document.getElementById('services-grid');
 const accountsList = document.getElementById('accounts-list');
 const codexAccountsList = document.getElementById('codex-accounts-list');
+const confirmModal = document.getElementById('confirm-modal');
+const confirmModalTitle = document.getElementById('confirm-modal-title');
+const confirmModalMessage = document.getElementById('confirm-modal-message');
+const confirmModalCancel = document.getElementById('confirm-modal-cancel');
+const confirmModalConfirm = document.getElementById('confirm-modal-confirm');
+const confirmModalClose = document.getElementById('confirm-modal-close');
 
 function activatePageTab(group, target) {
     const buttons = document.querySelectorAll(`.page-tab[data-page-group="${group}"]`);
@@ -216,6 +222,71 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text ?? '';
     return div.innerHTML;
+}
+
+let confirmDialogResolver = null;
+
+function closeConfirmDialog(confirmed) {
+    if (!confirmModal) {
+        return;
+    }
+
+    confirmModal.classList.remove('visible');
+    confirmModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('body-modal-open');
+
+    const resolver = confirmDialogResolver;
+    confirmDialogResolver = null;
+    if (resolver) {
+        resolver(Boolean(confirmed));
+    }
+}
+
+window.appConfirm = function(options = {}) {
+    if (!confirmModal) {
+        return Promise.resolve(window.confirm(options.message || '确定继续吗？'));
+    }
+
+    if (confirmDialogResolver) {
+        closeConfirmDialog(false);
+    }
+
+    confirmModalTitle.textContent = options.title || '确认操作';
+    confirmModalMessage.textContent = options.message || '确定继续吗？';
+    confirmModalCancel.textContent = options.cancelText || '取消';
+    confirmModalConfirm.textContent = options.confirmText || '确认';
+    confirmModal.classList.add('visible');
+    confirmModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('body-modal-open');
+
+    return new Promise(resolve => {
+        confirmDialogResolver = resolve;
+        confirmModalConfirm.focus();
+    });
+};
+
+if (confirmModal) {
+    confirmModalCancel.addEventListener('click', () => closeConfirmDialog(false));
+    confirmModalConfirm.addEventListener('click', () => closeConfirmDialog(true));
+    confirmModalClose.addEventListener('click', () => closeConfirmDialog(false));
+    confirmModal.addEventListener('click', event => {
+        if (event.target.closest('[data-confirm-close="cancel"]')) {
+            closeConfirmDialog(false);
+        }
+    });
+    document.addEventListener('keydown', event => {
+        if (!confirmModal.classList.contains('visible')) {
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeConfirmDialog(false);
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            closeConfirmDialog(true);
+        }
+    });
 }
 
 document.getElementById('clear-logs').addEventListener('click', () => {
@@ -403,7 +474,12 @@ function getProviderIcon(provider) {
 }
 
 window.removeAccount = async function(accountId) {
-    if (!confirm('确定要删除此账户吗？')) return;
+    const confirmed = await window.appConfirm({
+        title: '删除账户',
+        message: '确定要删除此账户吗？',
+        confirmText: '删除'
+    });
+    if (!confirmed) return;
     try {
         const result = await invoke('remove_account', { accountId });
         addLog(`✓ ${result}`);
@@ -452,34 +528,34 @@ function formatCodexPlan(plan) {
 }
 
 function formatCodexCredits(balance, unlimited) {
-    if (unlimited) return 'Credits Unlimited';
+    if (unlimited) return '额度不限';
     if (balance === null || balance === undefined || Number.isNaN(Number(balance))) return '';
-    return `Credits ${Number(balance).toFixed(2)}`;
+    return `额度 ${Number(balance).toFixed(2)}`;
 }
 
 function formatCodexDateTime(value) {
-    if (!value) return 'Unknown';
+    if (!value) return '未知';
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return escapeHtml(String(value));
 
-    const datePart = new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
+    const datePart = new Intl.DateTimeFormat('zh-CN', {
         year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
     }).format(date);
-    const timePart = new Intl.DateTimeFormat('en-US', {
+    const timePart = new Intl.DateTimeFormat('zh-CN', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
     }).format(date);
 
-    return `${datePart} at ${timePart}`;
+    return `${datePart} ${timePart}`;
 }
 
 function formatResetDays(days) {
     if (days === null || days === undefined) return '';
-    return `Resets in ${days} day${days === 1 ? '' : 's'}`;
+    return `${days} 天后重置`;
 }
 
 function renderCodexUsageSection(label, window, options = {}) {
@@ -489,14 +565,15 @@ function renderCodexUsageSection(label, window, options = {}) {
     const usedPercent = Math.min(window.usedPercent || 0, 100);
     const remainingPercent = window.remainingPercent ?? Math.max(0, 100 - usedPercent);
     const resetAtText = formatCodexDateTime(window.resetAt);
-    const updatedAtText = options.updatedAt ? `Updated ${formatCodexDateTime(options.updatedAt)}` : '';
+    const updatedAtText = options.updatedAt ? `更新于 ${formatCodexDateTime(options.updatedAt)}` : '';
     const resetSummary = formatResetDays(window.resetInDays);
+    const localizedLabel = label === '5h' ? '5 小时限额' : label === 'Weekly' ? '周限额' : label;
 
     return `
         <div class="codex-usage-section">
             <div class="codex-usage-header">
-                <span class="codex-usage-label">${escapeHtml(label)}</span>
-                <span class="codex-usage-used ${usageClass}">Used ${usedPercent}%</span>
+                <span class="codex-usage-label">${escapeHtml(localizedLabel)}</span>
+                <span class="codex-usage-used ${usageClass}">已使用 ${usedPercent}%</span>
             </div>
             <div class="codex-usage-meta">
                 <span></span>
@@ -506,7 +583,7 @@ function renderCodexUsageSection(label, window, options = {}) {
                 <div class="usage-fill ${usageClass}" style="width: ${usedPercent}%"></div>
             </div>
             <div class="codex-usage-footer">
-                <span>Remaining ${remainingPercent}%</span>
+                <span>剩余 ${remainingPercent}%</span>
             </div>
             ${updatedAtText || resetSummary ? `
                 <div class="codex-usage-extra">
@@ -550,7 +627,12 @@ function renderCodexAccounts() {
 }
 
 window.deleteCodexKey = async function(apiKey) {
-    if (!confirm('确定要删除此 Codex API Key 吗？')) return;
+    const confirmed = await window.appConfirm({
+        title: '删除 Codex API Key',
+        message: '确定要删除此 Codex API Key 吗？',
+        confirmText: '删除'
+    });
+    if (!confirmed) return;
     try {
         await invoke('delete_codex_key', { apiKey });
         addLog(`✓ Codex API Key 已删除`);
