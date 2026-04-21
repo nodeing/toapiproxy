@@ -7,7 +7,6 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $cliProjectDir = Join-Path $repoRoot "third_party\CLIProxyAPIPlus"
-$resolvedTarget = if ($Target) { $Target } else { "x86_64-pc-windows-msvc" }
 $binaryName = "cli-proxy-api-plus.exe"
 $outputPath = Join-Path $repoRoot ("src-tauri\resources\" + $binaryName)
 $tempOutputPath = Join-Path $repoRoot ("src-tauri\resources\cli-proxy-api-plus.build.exe")
@@ -16,6 +15,36 @@ $goBuildCache = Join-Path $goCacheRoot "build"
 $goModCache = Join-Path $goCacheRoot "mod"
 $binaryProcessName = "cli-proxy-api-plus"
 $artifactDir = Join-Path $repoRoot "build\backend"
+
+function Resolve-DefaultTargetTriple {
+    $rustHost = $null
+    if (Get-Command rustc -ErrorAction SilentlyContinue) {
+        try {
+            $rustHost = (& rustc -Vv 2>$null | Select-String '^host:' | ForEach-Object {
+                ($_ -split ':\s+', 2)[1].Trim()
+            } | Select-Object -First 1)
+        } catch {
+        }
+    }
+
+    switch ($rustHost) {
+        "x86_64-pc-windows-msvc" { return $rustHost }
+        "aarch64-pc-windows-msvc" { return $rustHost }
+    }
+
+    $arch = $env:PROCESSOR_ARCHITEW6432
+    if (-not $arch) {
+        $arch = $env:PROCESSOR_ARCHITECTURE
+    }
+
+    switch ($arch.ToUpperInvariant()) {
+        "ARM64" { return "aarch64-pc-windows-msvc" }
+        "AMD64" { return "x86_64-pc-windows-msvc" }
+        default { return "x86_64-pc-windows-msvc" }
+    }
+}
+
+$resolvedTarget = if ($Target) { $Target } else { Resolve-DefaultTargetTriple }
 
 function Resolve-GoTarget {
     param(

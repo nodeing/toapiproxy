@@ -34,8 +34,9 @@ var loadCodexAccounts;
         return `额度 ${Number(balance).toFixed(2)}`;
     }
 
-    function formatCodexDateTime(value) {
-        if (!value) return '未知';
+    function formatCodexDateTime(value, options = {}) {
+        const { includeSeconds = false, fallback = '未知' } = options;
+        if (!value) return fallback;
 
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return escapeHtml(String(value));
@@ -48,38 +49,16 @@ var loadCodexAccounts;
         const timePart = new Intl.DateTimeFormat('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',
+            ...(includeSeconds ? { second: '2-digit' } : {}),
             hour12: false,
         }).format(date);
 
         return `${datePart} ${timePart}`;
     }
 
-    function formatMinuteCountdown(resetAt) {
-        if (!resetAt) return '';
-
-        const resetDate = new Date(resetAt);
-        if (Number.isNaN(resetDate.getTime())) return '';
-
-        const diffMs = resetDate.getTime() - Date.now();
-        if (diffMs <= 0) return '即将重置';
-
-        const remainingMinutes = Math.max(1, Math.ceil(diffMs / 60000));
-        return `${remainingMinutes} 分钟后重置`;
-    }
-
-    function formatResetDays(days) {
-        if (days === null || days === undefined) return '';
-        return `${days} 天后重置`;
-    }
-
-    function formatResetSummary(window, label) {
-        if (!window) return '';
-
-        if (label === '5h') {
-            return formatMinuteCountdown(window.resetAt);
-        }
-
-        return formatResetDays(window.resetInDays);
+    function formatResetSummary(window) {
+        if (!window?.resetAt) return '';
+        return `重置于 ${formatCodexDateTime(window.resetAt, { includeSeconds: true, fallback: '' })}`;
     }
 
     function renderCodexUsageSection(label, window, options = {}) {
@@ -88,9 +67,9 @@ var loadCodexAccounts;
         const usageClass = getUsageLevelClass(window.usedPercent || 0);
         const usedPercent = Math.min(window.usedPercent || 0, 100);
         const remainingPercent = window.remainingPercent ?? Math.max(0, 100 - usedPercent);
-        const resetAtText = formatCodexDateTime(window.resetAt);
+        const resetAtText = formatCodexDateTime(window.resetAt, { includeSeconds: true });
         const updatedAtText = options.updatedAt ? `更新于 ${formatCodexDateTime(options.updatedAt)}` : '';
-        const resetSummary = formatResetSummary(window, label);
+        const resetSummary = formatResetSummary(window);
         const localizedLabel = label === '5h' ? '5 小时限额' : label === 'Weekly' ? '周限额' : label;
 
         return `
@@ -101,7 +80,7 @@ var loadCodexAccounts;
                 </div>
                 <div class="codex-usage-meta">
                     <span></span>
-                    <span>${resetAtText}</span>
+                    <span>重置于 ${resetAtText}</span>
                 </div>
                 <div class="usage-track codex-usage-track">
                     <div class="usage-fill ${usageClass}" style="width: ${usedPercent}%"></div>

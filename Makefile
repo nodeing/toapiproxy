@@ -77,6 +77,7 @@ build:
 	$(BUILD_CMD) $(BUILD_ARGS)
 
 dev:
+	$(CLI_BUILD_CMD)
 	$(DEV_CMD)
 
 clean:

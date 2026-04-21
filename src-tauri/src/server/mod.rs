@@ -139,7 +139,17 @@ impl ProxyServer {
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
-        let mut child = cmd.spawn().map_err(|e| format!("Spawn failed: {}", e))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            #[cfg(windows)]
+            if e.raw_os_error() == Some(216) {
+                return format!(
+                    "Spawn failed: {}. The bundled cli-proxy-api-plus.exe is likely built for a different CPU architecture than this machine. Rebuild the backend for the current host with `make build-cli-proxy` or rerun `make dev`.",
+                    e
+                );
+            }
+
+            format!("Spawn failed: {}", e)
+        })?;
 
         let pid = child.id();
         self.add_log(format!("✓ Server started (PID: {})", pid));

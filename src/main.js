@@ -533,8 +533,9 @@ function formatCodexCredits(balance, unlimited) {
     return `额度 ${Number(balance).toFixed(2)}`;
 }
 
-function formatCodexDateTime(value) {
-    if (!value) return '未知';
+function formatCodexDateTime(value, options = {}) {
+    const { includeSeconds = false, fallback = '未知' } = options;
+    if (!value) return fallback;
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return escapeHtml(String(value));
@@ -547,15 +548,16 @@ function formatCodexDateTime(value) {
     const timePart = new Intl.DateTimeFormat('zh-CN', {
         hour: '2-digit',
         minute: '2-digit',
+        ...(includeSeconds ? { second: '2-digit' } : {}),
         hour12: false,
     }).format(date);
 
     return `${datePart} ${timePart}`;
 }
 
-function formatResetDays(days) {
-    if (days === null || days === undefined) return '';
-    return `${days} 天后重置`;
+function formatResetSummary(window) {
+    if (!window?.resetAt) return '';
+    return `重置于 ${formatCodexDateTime(window.resetAt, { includeSeconds: true, fallback: '' })}`;
 }
 
 function renderCodexUsageSection(label, window, options = {}) {
@@ -564,9 +566,9 @@ function renderCodexUsageSection(label, window, options = {}) {
     const usageClass = getUsageLevelClass(window.usedPercent || 0);
     const usedPercent = Math.min(window.usedPercent || 0, 100);
     const remainingPercent = window.remainingPercent ?? Math.max(0, 100 - usedPercent);
-    const resetAtText = formatCodexDateTime(window.resetAt);
+    const resetAtText = formatCodexDateTime(window.resetAt, { includeSeconds: true });
     const updatedAtText = options.updatedAt ? `更新于 ${formatCodexDateTime(options.updatedAt)}` : '';
-    const resetSummary = formatResetDays(window.resetInDays);
+    const resetSummary = formatResetSummary(window);
     const localizedLabel = label === '5h' ? '5 小时限额' : label === 'Weekly' ? '周限额' : label;
 
     return `
@@ -577,7 +579,7 @@ function renderCodexUsageSection(label, window, options = {}) {
             </div>
             <div class="codex-usage-meta">
                 <span></span>
-                <span>${resetAtText}</span>
+                <span>重置于 ${resetAtText}</span>
             </div>
             <div class="usage-track codex-usage-track">
                 <div class="usage-fill ${usageClass}" style="width: ${usedPercent}%"></div>
