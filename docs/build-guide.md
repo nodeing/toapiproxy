@@ -9,10 +9,10 @@
 
 当前命名规则如下：
 
-- `TOAPIPROXY_1.0.0_windows_x64_setup.exe`
-- `TOAPIPROXY_1.0.0_windows_arm64_setup.exe`
-- `TOAPIPROXY_1.0.0_macos_intel.dmg`
-- `TOAPIPROXY_1.0.0_macos_apple_silicon.dmg`
+- `TOAPIPROXY_0.1.0_windows_x64_setup.exe`
+- `TOAPIPROXY_0.1.0_windows_arm64_setup.exe`
+- `TOAPIPROXY_0.1.0_macos_intel.dmg`
+- `TOAPIPROXY_0.1.0_macos_apple_silicon.dmg`
 
 说明：
 
@@ -132,8 +132,8 @@ d:\workspace\app\toapiproxy\build\dist
 
 你会拿到这两个文件：
 
-- `TOAPIPROXY_1.0.0_windows_x64_setup.exe`
-- `TOAPIPROXY_1.0.0_windows_arm64_setup.exe`
+- `TOAPIPROXY_0.1.0_windows_x64_setup.exe`
+- `TOAPIPROXY_0.1.0_windows_arm64_setup.exe`
 
 ### 7. 可选检查命令
 
@@ -204,8 +204,8 @@ build/dist
 
 你会拿到这两个文件：
 
-- `TOAPIPROXY_1.0.0_macos_intel.dmg`
-- `TOAPIPROXY_1.0.0_macos_apple_silicon.dmg`
+- `TOAPIPROXY_0.1.0_macos_intel.dmg`
+- `TOAPIPROXY_0.1.0_macos_apple_silicon.dmg`
 
 ## 常见说明
 
