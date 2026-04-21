@@ -12,10 +12,13 @@ mod watcher;
 use commands::{start_proxy_stack, stop_proxy_stack, AppState};
 use std::{fs, path::PathBuf};
 use tauri::{
+    include_image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 use tauri_plugin_autostart::MacosLauncher;
 
 fn runtime_config_file_name() -> &'static str {
@@ -62,6 +65,81 @@ fn prepare_runtime_config(
     }
 
     Ok(runtime_config_path)
+}
+
+fn resolve_bundled_paths(app: &tauri::App, binary_name: &str) -> (PathBuf, PathBuf) {
+    let resource_candidates = [
+        (binary_name.to_string(), "config.yaml".to_string()),
+        (
+            format!("resources/{}", binary_name),
+            "resources/config.yaml".to_string(),
+        ),
+    ];
+
+    for (binary_resource, config_resource) in &resource_candidates {
+        if let (Ok(binary_path), Ok(config_path)) = (
+            app.path()
+                .resolve(binary_resource, tauri::path::BaseDirectory::Resource),
+            app.path()
+                .resolve(config_resource, tauri::path::BaseDirectory::Resource),
+        ) {
+            if binary_path.exists() && config_path.exists() {
+                return (binary_path, config_path);
+            }
+        }
+    }
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        for (binary_resource, config_resource) in &resource_candidates {
+            let binary_path = resource_dir.join(binary_resource);
+            let config_path = resource_dir.join(config_resource);
+            if binary_path.exists() && config_path.exists() {
+                return (binary_path, config_path);
+            }
+        }
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let fallback_dirs = [
+                exe_dir.to_path_buf(),
+                exe_dir.join("resources"),
+                exe_dir
+                    .parent()
+                    .map(|contents_dir| contents_dir.join("Resources"))
+                    .unwrap_or_default(),
+                exe_dir
+                    .parent()
+                    .map(|contents_dir| contents_dir.join("Resources/resources"))
+                    .unwrap_or_default(),
+            ];
+
+            for base_dir in fallback_dirs {
+                if base_dir.as_os_str().is_empty() {
+                    continue;
+                }
+                let binary_path = base_dir.join(binary_name);
+                let config_path = base_dir.join("config.yaml");
+                if binary_path.exists() && config_path.exists() {
+                    return (binary_path, config_path);
+                }
+            }
+        }
+    }
+
+    (PathBuf::new(), PathBuf::new())
+}
+
+fn cleanup_background_services(app_handle: &tauri::AppHandle) {
+    if let Some(state) = app_handle.try_state::<AppState>() {
+        if let Ok(mut watcher) = state.file_watcher.lock() {
+            watcher.stop();
+        }
+        let _ = stop_proxy_stack(state.inner());
+        if let Ok(mut running) = state.server_running.lock() {
+            *running = false;
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -127,6 +205,12 @@ pub fn run() {
             commands::test_claude_provider_connectivity,
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                app.set_activation_policy(ActivationPolicy::Accessory);
+                app.set_dock_visibility(false);
+            }
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -154,58 +238,7 @@ pub fn run() {
                     dev_resources.join("config.yaml"),
                 )
             } else {
-                let mut found_binary = std::path::PathBuf::new();
-                let mut found_config = std::path::PathBuf::new();
-
-                if let Ok(bin) = app
-                    .path()
-                    .resolve(binary_name, tauri::path::BaseDirectory::Resource)
-                {
-                    if bin.exists() {
-                        found_binary = bin;
-                    }
-                }
-
-                if let Ok(cfg) = app
-                    .path()
-                    .resolve("config.yaml", tauri::path::BaseDirectory::Resource)
-                {
-                    if cfg.exists() {
-                        found_config = cfg;
-                    }
-                }
-
-                if !found_binary.exists() {
-                    if let Ok(resource_path) = app.path().resource_dir() {
-                        let bin = resource_path.join(binary_name);
-                        let cfg = resource_path.join("config.yaml");
-                        if bin.exists() {
-                            found_binary = bin;
-                            found_config = cfg;
-                        }
-                    }
-                }
-
-                if !found_binary.exists() {
-                    if let Ok(exe_path) = std::env::current_exe() {
-                        if let Some(exe_dir) = exe_path.parent() {
-                            let resources_dir = exe_dir.join("resources");
-                            let bin = resources_dir.join(binary_name);
-                            if bin.exists() {
-                                found_binary = bin;
-                                found_config = resources_dir.join("config.yaml");
-                            } else {
-                                let bin = exe_dir.join(binary_name);
-                                if bin.exists() {
-                                    found_binary = bin;
-                                    found_config = exe_dir.join("config.yaml");
-                                }
-                            }
-                        }
-                    }
-                }
-
-                (found_binary, found_config)
+                resolve_bundled_paths(app, binary_name)
             };
 
             let config_path = match prepare_runtime_config(app, &bundled_config_path) {
@@ -262,43 +295,39 @@ pub fn run() {
                 }
             };
 
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
             let toggle_server = MenuItem::with_id(
                 app,
                 "toggle_server",
                 if server_started {
-                    "Stop Server"
+                    "停止服务"
                 } else {
-                    "Start Server"
+                    "启动服务"
                 },
                 true,
                 None::<&str>,
             )?;
             let copy_url =
-                MenuItem::with_id(app, "copy_url", "Copy Server URL", true, None::<&str>)?;
+                MenuItem::with_id(app, "copy_url", "复制服务地址", true, None::<&str>)?;
 
             let menu = Menu::with_items(app, &[&show, &toggle_server, &copy_url, &quit])?;
 
             let tooltip = if server_started {
-                "TOAPIPROXY - Running (port 8317)"
+                "ToAPI Proxy - 运行中（端口 8317）"
             } else {
-                "TOAPIPROXY - Stopped"
+                "ToAPI Proxy - 已停止"
             };
 
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(include_image!("icons/trayTemplate.png"))
+                .icon_as_template(true)
                 .menu(&menu)
                 .tooltip(tooltip)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "quit" => {
-                        if let Some(state) = app.try_state::<AppState>() {
-                            if let Ok(mut watcher) = state.file_watcher.lock() {
-                                watcher.stop();
-                            }
-                            let _ = stop_proxy_stack(state.inner());
-                        }
+                        cleanup_background_services(app);
                         app.exit(0);
                     }
                     "show" => {
@@ -346,19 +375,8 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                if cfg!(debug_assertions) {
-                    if let Some(state) = window.app_handle().try_state::<AppState>() {
-                        if let Ok(mut watcher) = state.file_watcher.lock() {
-                            watcher.stop();
-                        }
-                        let _ = stop_proxy_stack(state.inner());
-                    }
-                    api.prevent_close();
-                    window.app_handle().exit(0);
-                } else {
-                    let _ = window.hide();
-                    api.prevent_close();
-                }
+                let _ = window.hide();
+                api.prevent_close();
             }
         })
         .run(tauri::generate_context!())

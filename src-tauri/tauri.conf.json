@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "TOAPIPROXY",
-  "version": "1.0.0",
-  "identifier": "io.toapiproxy.app",
+  "productName": "ToAPI Proxy",
+  "version": "0.1.0",
+  "identifier": "io.toapiproxy",
   "build": {
     "frontendDist": "../src"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "TOAPIPROXY",
+        "title": "ToAPI Proxy",
         "width": 1080,
         "height": 650,
         "minWidth": 1080,
