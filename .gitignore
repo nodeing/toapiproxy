@@ -2,6 +2,29 @@
 tmp/
 .cache/
 
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+auths/
+config.local.*
+*.local.json
+*.local.yaml
+*.local.yml
+*.local.toml
+codex-config-profiles.json
+claude-config-profiles.json
+backend-usage.json
+usage-statistics/
+
 # Build outputs
 build/
 src-tauri/target/

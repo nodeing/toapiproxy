@@ -13,7 +13,7 @@ else
     detected_OS := Unix
 endif
 
-.PHONY: help build clean dev install build-cli-proxy release \
+.PHONY: help build clean dev install build-cli-proxy security-check release \
 	clean-win-dist clean-mac-dist \
 	build-win build-mac \
 	build-windows-x64 build-windows-arm64 build-windows-all \
@@ -39,6 +39,7 @@ help:
 	@echo "  make dev             - Run in development mode"
 	@echo "  make clean           - Clean build artifacts"
 	@echo "  make build-cli-proxy - Build CLIProxyAPI binary only"
+	@echo "  make security-check  - Check for personal secrets before committing"
 	@echo "  make build-win             - Build both Windows installers into build/dist"
 	@echo "  make build-mac             - Build both macOS DMGs into build/dist"
 	@echo "  make build-windows-x64     - Build Windows NSIS installer for x64"
@@ -61,6 +62,7 @@ ifeq ($(detected_OS),Windows)
     DEV_CMD = cargo tauri dev
     CLEAN_CMD = cargo tauri build --clean
     CLI_BUILD_CMD = powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts\\build-cli-proxy.ps1"
+    SECURITY_CHECK_CMD = powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts\\check-security.ps1"
     RELEASE_CMD = powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts\\release.ps1"
     BUILD_ARGS = -Bundles nsis -CopyInstaller
 else
@@ -69,6 +71,7 @@ else
     DEV_CMD = cargo tauri dev
     CLEAN_CMD = cargo tauri build --clean
     CLI_BUILD_CMD = chmod +x scripts/build-cli-proxy.sh 2>/dev/null; scripts/build-cli-proxy.sh
+    SECURITY_CHECK_CMD = scripts/check-security.sh
     RELEASE_CMD = pwsh -NoLogo -NoProfile -File scripts/release.ps1
     BUILD_ARGS =
 endif
@@ -85,6 +88,9 @@ clean:
 
 build-cli-proxy:
 	$(CLI_BUILD_CMD)
+
+security-check:
+	$(SECURITY_CHECK_CMD)
 
 release:
 	$(RELEASE_CMD) $(if $(VERSION),-Version $(VERSION),)
