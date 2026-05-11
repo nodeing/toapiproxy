@@ -3,6 +3,7 @@
     var codexAccountSnapshots = [];
     var activeServiceTab = 'codex';
     var visibleServiceIds = ['codex'];
+    var editingServiceIds = new Set();
 
     var serviceIcons = {
         claude: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 18.6 7v10L12 20.8 5.4 17V7L12 3.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><path d="M12 7.8 15.8 10v4L12 16.2 8.2 14v-4L12 7.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path></svg>',
@@ -11,6 +12,7 @@
         copilot: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 15.5c-1.9 0-3.5-1.6-3.5-3.5S5.6 8.5 7.5 8.5c.7-2 2.6-3.3 4.8-3.3 2.8 0 5.2 2.3 5.2 5.2v.3c1.4.3 2.5 1.6 2.5 3.1 0 1.8-1.4 3.2-3.2 3.2H7.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><path d="M9 12h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>',
         qwen: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="M16.5 16.5 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M9.5 12.5 11.3 14.3 15 10.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
         antigravity: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8.5c0-1.9 1.6-3.5 3.5-3.5 1.1 0 2.1.5 2.8 1.4.4-.2.9-.4 1.4-.4 1.7 0 3.1 1.4 3.1 3.1v.3c1.3.4 2.2 1.6 2.2 3 0 1.8-1.4 3.2-3.2 3.2H9.2C7.4 15.6 6 14.2 6 12.4c0-1.7 1.2-3.2 3-3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+        default: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><path d="M12 8v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"></circle></svg>',
     };
 
     var serviceHelp = {
@@ -257,6 +259,20 @@
         return '当前为轮询模式，所有可用账号会按同优先级参与轮询。';
     }
 
+    function getPreferredAccount(service) {
+        if (!service || !Array.isArray(service.accounts) || !service.preferredAccountName) {
+            return null;
+        }
+
+        return service.accounts.find(function (account) {
+            return account.name === service.preferredAccountName;
+        }) || null;
+    }
+
+    function getModeLabel(service) {
+        return service.mode === 'preferred' && service.preferredAccountName ? '首选账号模式' : '轮询模式';
+    }
+
     function renderConnectionActions(service) {
         if (service.id === 'kiro') {
             return [
@@ -283,7 +299,40 @@
         return '<button class="btn ' + buttonClass + ' service-connect-btn" onclick="' + actionHandler + '">' + buttonLabel + '</button>';
     }
 
-    function renderRoutingControls(service) {
+    function renderRoutingDisplay(service) {
+        if (!service.accounts || !service.accounts.length) {
+            return '<div class="service-account-empty">当前还没有可配置的账号。</div>';
+        }
+
+        var preferred = getPreferredAccount(service);
+        var preferredLabel = preferred ? buildAccountOptionLabel(preferred) : '未设置';
+        var preferredClass = preferred ? '' : ' service-config-value-muted';
+
+        return [
+            '<div class="service-routing-panel service-routing-display">',
+            '<div class="service-routing-display-header">',
+            '<div>',
+            '<div class="service-config-label">当前配置</div>',
+            '<div class="service-config-title">' + escapeHtmlValue(getModeLabel(service)) + '</div>',
+            '</div>',
+            '<button class="btn btn-secondary service-edit-btn" onclick="editServiceRouting(\'' + service.id + '\')">编辑设置</button>',
+            '</div>',
+            '<div class="service-config-grid">',
+            '<div class="service-config-item">',
+            '<span class="service-config-label">账号模式</span>',
+            '<span class="service-config-value">' + escapeHtmlValue(getModeLabel(service)) + '</span>',
+            '</div>',
+            '<div class="service-config-item">',
+            '<span class="service-config-label">首选账号</span>',
+            '<span class="service-config-value' + preferredClass + '">' + escapeHtmlValue(preferredLabel) + '</span>',
+            '</div>',
+            '</div>',
+            '<div class="service-summary">' + escapeHtmlValue(renderModeSummary(service)) + '</div>',
+            '</div>',
+        ].join('');
+    }
+
+    function renderRoutingEditor(service) {
         if (!service.accounts || !service.accounts.length) {
             return '<div class="service-account-empty">当前还没有可配置的账号。</div>';
         }
@@ -303,7 +352,14 @@
         }).join('');
 
         return [
-            '<div class="service-routing-panel">',
+            '<div class="service-routing-panel service-routing-editor">',
+            '<div class="service-routing-display-header">',
+            '<div>',
+            '<div class="service-config-label">编辑配置</div>',
+            '<div class="service-config-title">账号路由设置</div>',
+            '</div>',
+            '<button class="btn btn-secondary service-edit-btn" onclick="cancelServiceRoutingEdit(\'' + service.id + '\')">取消</button>',
+            '</div>',
             '<div class="service-field">',
             '<label for="service-mode-' + service.id + '">账号模式</label>',
             '<select id="service-mode-' + service.id + '" class="service-select" onchange="onServiceModeChange(\'' + service.id + '\')">',
@@ -321,9 +377,13 @@
             '<div class="service-routing-actions">',
             '<button class="btn btn-primary" id="service-apply-' + service.id + '" onclick="applyServiceAccountMode(\'' + service.id + '\')">保存设置</button>',
             '</div>',
-            '<div class="service-summary">' + escapeHtmlValue(renderModeSummary(service)) + '</div>',
+            '<div class="service-summary">修改后需要保存才会生效。</div>',
             '</div>',
         ].join('');
+    }
+
+    function renderRoutingControls(service) {
+        return editingServiceIds.has(service.id) ? renderRoutingEditor(service) : renderRoutingDisplay(service);
     }
 
     function renderServiceCard(service) {
@@ -334,7 +394,7 @@
         return [
             '<div class="service-card service-card-enhanced" data-service="' + service.id + '">',
             '<div class="service-header">',
-            '<span class="service-icon">' + (serviceIcons[service.id] || '&#128274;') + '</span>',
+            '<span class="service-icon">' + (serviceIcons[service.id] || serviceIcons.default) + '</span>',
             '<div class="service-header-copy">',
             '<span class="service-name">' + escapeHtmlValue(service.name) + '</span>',
             '<p class="service-help">' + escapeHtmlValue(serviceHelp[service.id] || '') + '</p>',
@@ -401,11 +461,35 @@
             return;
         }
 
-        accountSelect.disabled = modeSelect.value !== 'preferred';
+        var preferredMode = modeSelect.value === 'preferred';
+        accountSelect.disabled = !preferredMode;
+        if (preferredMode && !accountSelect.value) {
+            var firstEnabledOption = Array.from(accountSelect.options).find(function (option) {
+                return option.value && !option.disabled;
+            });
+            if (firstEnabledOption) {
+                accountSelect.value = firstEnabledOption.value;
+            }
+        }
     }
 
     window.onServiceModeChange = function (serviceId) {
         updateAccountSelectorState(serviceId);
+    };
+
+    window.editServiceRouting = function (serviceId) {
+        editingServiceIds.add(serviceId);
+        renderServiceOverview();
+
+        var modeSelect = document.getElementById('service-mode-' + serviceId);
+        if (modeSelect) {
+            modeSelect.focus();
+        }
+    };
+
+    window.cancelServiceRoutingEdit = function (serviceId) {
+        editingServiceIds.delete(serviceId);
+        renderServiceOverview();
     };
 
     window.applyServiceAccountMode = async function (serviceId) {
@@ -440,6 +524,7 @@
                 preferredAccountName: mode === 'preferred' ? preferredAccountName : null,
             });
             addLogLine(result);
+            editingServiceIds.delete(serviceId);
 
             if (typeof window.refreshState === 'function') {
                 await window.refreshState();

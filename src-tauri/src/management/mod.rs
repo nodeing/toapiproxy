@@ -4,7 +4,7 @@ use serde_json::json;
 use std::collections::HashSet;
 use std::time::Duration;
 
-const MANAGEMENT_SECRET: &str = "toapiproxy-local-dev";
+pub(crate) const MANAGEMENT_SECRET: &str = "toapiproxy-local-dev";
 const ROUND_ROBIN_STRATEGY: &str = "round-robin";
 const FILL_FIRST_STRATEGY: &str = "fill-first";
 const MODE_ROUND_ROBIN: &str = "round-robin";
