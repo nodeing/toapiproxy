@@ -1,4 +1,5 @@
 use crate::auth::{AuthManager, ServiceType};
+use crate::backend_usage::{fetch_backend_usage_statistics, BackendUsageSnapshot};
 use crate::claude_providers::{
     apply_claude_provider as apply_claude_provider_impl,
     delete_claude_provider as delete_claude_provider_impl,
@@ -8,11 +9,18 @@ use crate::claude_providers::{
     upsert_claude_provider, ClaudeProviderSummary, ClaudeProviderUpsertInput,
 };
 use crate::codex::{CodexAccountSnapshot, CodexClient, CodexKey};
+use crate::codex_config::{
+    apply_codex_config_profile as apply_codex_config_profile_impl,
+    delete_codex_config_profile as delete_codex_config_profile_impl,
+    duplicate_codex_config_profile as duplicate_codex_config_profile_impl,
+    list_codex_config_profiles, upsert_codex_config_profile, CodexConfigProfileSummary,
+    CodexConfigUpsertInput,
+};
 use crate::droid_models::{
     delete_droid_custom_model as delete_droid_custom_model_impl,
-    duplicate_droid_custom_model as duplicate_droid_custom_model_impl,
-    list_droid_custom_models, set_droid_default_model as set_droid_default_model_impl,
-    upsert_droid_custom_model, DroidCustomModelSummary, DroidCustomModelUpsertInput,
+    duplicate_droid_custom_model as duplicate_droid_custom_model_impl, list_droid_custom_models,
+    set_droid_default_model as set_droid_default_model_impl, upsert_droid_custom_model,
+    DroidCustomModelSummary, DroidCustomModelUpsertInput,
 };
 use crate::management::{ManagementClient, ServiceRoutingOverview};
 use crate::server::{AuthResult, ProxyServer};
@@ -21,7 +29,7 @@ use crate::usage::UsageClient;
 use crate::watcher::AuthFileWatcher;
 use serde::Serialize;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 
 // App State
 pub struct AppState {
@@ -603,6 +611,28 @@ pub async fn apply_service_account_mode(
 }
 
 #[tauri::command]
+pub async fn get_backend_usage_statistics(
+    state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+    time_range: Option<String>,
+) -> Result<BackendUsageSnapshot, String> {
+    let backend_port = state.server.backend_port();
+    let server_running = *state.server_running.lock().map_err(|e| e.to_string())?;
+    let app_data_dir = app_handle
+        .path()
+        .app_local_data_dir()
+        .map_err(|error| format!("Failed to resolve app data directory: {}", error))?;
+
+    fetch_backend_usage_statistics(
+        backend_port,
+        &app_data_dir,
+        time_range.as_deref(),
+        server_running,
+    )
+    .await
+}
+
+#[tauri::command]
 pub async fn get_claude_providers(
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
@@ -699,4 +729,44 @@ pub fn duplicate_droid_custom_model(model_id: String) -> Result<String, String> 
 #[tauri::command]
 pub fn set_droid_default_model(model_id: String) -> Result<String, String> {
     set_droid_default_model_impl(&model_id)
+}
+
+#[tauri::command]
+pub fn get_codex_config_profiles(
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<CodexConfigProfileSummary>, String> {
+    list_codex_config_profiles(&app_handle)
+}
+
+#[tauri::command]
+pub fn save_codex_config_profile(
+    app_handle: tauri::AppHandle,
+    profile: CodexConfigUpsertInput,
+    original_id: Option<String>,
+) -> Result<String, String> {
+    upsert_codex_config_profile(&app_handle, profile, original_id)
+}
+
+#[tauri::command]
+pub fn apply_codex_config_profile(
+    app_handle: tauri::AppHandle,
+    profile_id: String,
+) -> Result<String, String> {
+    apply_codex_config_profile_impl(&app_handle, &profile_id)
+}
+
+#[tauri::command]
+pub fn delete_codex_config_profile(
+    app_handle: tauri::AppHandle,
+    profile_id: String,
+) -> Result<String, String> {
+    delete_codex_config_profile_impl(&app_handle, &profile_id)
+}
+
+#[tauri::command]
+pub fn duplicate_codex_config_profile(
+    app_handle: tauri::AppHandle,
+    profile_id: String,
+) -> Result<String, String> {
+    duplicate_codex_config_profile_impl(&app_handle, &profile_id)
 }

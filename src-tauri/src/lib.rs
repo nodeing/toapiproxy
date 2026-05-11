@@ -1,6 +1,8 @@
 mod auth;
+mod backend_usage;
 mod claude_providers;
 mod codex;
+mod codex_config;
 mod commands;
 mod droid_models;
 mod management;
@@ -11,14 +13,14 @@ mod watcher;
 
 use commands::{start_proxy_stack, stop_proxy_stack, AppState};
 use std::{fs, path::PathBuf};
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 use tauri::{
     include_image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
-#[cfg(target_os = "macos")]
-use tauri::ActivationPolicy;
 use tauri_plugin_autostart::MacosLauncher;
 
 fn runtime_config_file_name() -> &'static str {
@@ -191,6 +193,7 @@ pub fn run() {
             commands::import_codex_token,
             commands::get_service_routing_overview,
             commands::apply_service_account_mode,
+            commands::get_backend_usage_statistics,
             commands::get_droid_custom_models,
             commands::save_droid_custom_model,
             commands::delete_droid_custom_model,
@@ -203,6 +206,11 @@ pub fn run() {
             commands::duplicate_claude_provider,
             commands::set_claude_provider_enabled,
             commands::test_claude_provider_connectivity,
+            commands::get_codex_config_profiles,
+            commands::save_codex_config_profile,
+            commands::apply_codex_config_profile,
+            commands::delete_codex_config_profile,
+            commands::duplicate_codex_config_profile,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -222,9 +230,9 @@ pub fn run() {
             let state = app.state::<AppState>();
 
             let binary_name = if cfg!(windows) {
-                "cli-proxy-api-plus.exe"
+                "cli-proxy-api.exe"
             } else {
-                "cli-proxy-api-plus"
+                "cli-proxy-api"
             };
 
             let (binary_path, bundled_config_path) = if cfg!(debug_assertions) {
@@ -256,12 +264,27 @@ pub fn run() {
             log::info!("Bundled config path: {:?}", bundled_config_path);
             log::info!("Config path: {:?}", config_path);
 
+            match app.path().app_local_data_dir() {
+                Ok(app_data_dir) => {
+                    if let Err(err) = fs::create_dir_all(&app_data_dir) {
+                        log::warn!("Failed to create app data directory for backend PID: {}", err);
+                    } else {
+                        state
+                            .server
+                            .set_pid_file_path(app_data_dir.join("cli-proxy-api.pid"));
+                    }
+                }
+                Err(err) => {
+                    log::warn!("Failed to resolve app data directory for backend PID: {}", err);
+                }
+            }
+
             if binary_path.exists() {
                 state.server.set_binary_path(binary_path);
                 state.server.set_config_path(config_path);
-                log::info!("cli-proxy-api-plus binary found");
+                log::info!("cli-proxy-api binary found");
             } else {
-                log::warn!("cli-proxy-api-plus binary not found, using simulation mode");
+                log::warn!("cli-proxy-api binary not found, using simulation mode");
             }
 
             let app_handle = app.handle().clone();

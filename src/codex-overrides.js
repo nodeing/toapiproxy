@@ -34,6 +34,33 @@ var loadCodexAccounts;
         return `额度 ${Number(balance).toFixed(2)}`;
     }
 
+    const codexEmptyIconSvg = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="5.5" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+            <path d="M8 18.5h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M10 14.5v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M14 14.5v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+    `;
+
+    const refreshIconSvg = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M4 18v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M6.2 9A7 7 0 0 1 18 6.2L20 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M17.8 15A7 7 0 0 1 6 17.8L4 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+        </svg>
+    `;
+
+    const deleteIconSvg = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M6 7l1 14h10l1-14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+            <path d="M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+        </svg>
+    `;
+
     function formatCodexDateTime(value, options = {}) {
         const { includeSeconds = false, fallback = '未知' } = options;
         if (!value) return fallback;
@@ -114,7 +141,7 @@ var loadCodexAccounts;
             codexAccountsList.innerHTML = `
                 <div class="card">
                     <div class="card-body codex-empty-state">
-                        <p class="codex-empty-icon">&#128187;</p>
+                        <p class="codex-empty-icon">${codexEmptyIconSvg}</p>
                         <p class="codex-empty-title">No Codex accounts yet</p>
                         <p class="codex-empty-copy">
                             Use "Add Account" to import the current Codex login or add a token manually.
@@ -167,8 +194,8 @@ var loadCodexAccounts;
                             ${identityParts.length ? `<div class="codex-identity-row">${identityParts.join('')}</div>` : ''}
                         </div>
                         <div class="codex-card-actions">
-                            <button class="codex-action-btn" onclick="refreshCodexAccounts()" title="Refresh">&#8635;</button>
-                            <button class="account-delete" onclick='deleteCodexKey(${accountRefArg})' title="Delete">&#128465;</button>
+                            <button class="codex-action-btn" onclick="refreshCodexAccounts()" title="Refresh">${refreshIconSvg}</button>
+                            <button class="account-delete" onclick='deleteCodexKey(${accountRefArg})' title="Delete">${deleteIconSvg}</button>
                         </div>
                     </div>
                     ${usageMarkup ? `<div class="codex-usage-grid">${usageMarkup}</div>` : ''}
@@ -181,7 +208,7 @@ var loadCodexAccounts;
     async function loadCodexAccountSnapshots() {
         try {
             const snapshots = await invoke('get_codex_accounts');
-            codexKeys = snapshots || [];
+            codexKeys = Array.isArray(snapshots) ? snapshots : [];
             if (typeof codexAccounts !== 'undefined') {
                 codexAccounts = codexKeys;
             }

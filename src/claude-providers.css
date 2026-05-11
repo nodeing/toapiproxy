@@ -30,7 +30,7 @@
     position: relative;
     margin-bottom: 16px;
     padding: 18px 52px 18px 16px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: rgba(251, 191, 36, 0.12);
     border: 1px solid rgba(251, 191, 36, 0.28);
     color: #f6d17a;
@@ -77,16 +77,16 @@
     justify-content: space-between;
     gap: 16px;
     padding: 22px 24px;
-    border-radius: 18px;
-    background: rgba(17, 63, 118, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .provider-card:hover,
 .provider-card:focus-within {
-    border-color: rgba(233, 69, 96, 0.45);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-soft);
     transform: translateY(-1px);
 }
 
@@ -110,25 +110,25 @@
 .provider-avatar {
     width: 58px;
     height: 58px;
-    border-radius: 18px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #ffd2db;
+    background: var(--bg-card-strong);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
     font-size: 28px;
     font-weight: 700;
 }
 
 .provider-index-avatar {
-    background: rgba(115, 184, 255, 0.12);
-    border-color: rgba(115, 184, 255, 0.14);
-    color: #cfe5ff;
+    background: var(--bg-card-strong);
+    border-color: var(--border);
+    color: var(--text-primary);
     font-size: 22px;
     font-weight: 800;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }
 
 .provider-meta {
@@ -151,7 +151,7 @@
 
 .provider-card-subtitle {
     margin-top: 8px;
-    color: #6eaef5;
+    color: var(--text-secondary);
     font-size: 16px;
     line-height: 1.5;
     word-break: break-all;
@@ -168,7 +168,7 @@
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 700;
     background: rgba(255, 255, 255, 0.08);
@@ -181,8 +181,8 @@
 }
 
 .provider-badge.enabled {
-    background: rgba(59, 130, 246, 0.18);
-    color: #bcd6ff;
+    background: var(--accent-soft);
+    color: #d7dcde;
 }
 
 .provider-badge.disabled {
@@ -191,8 +191,8 @@
 }
 
 .provider-badge.format {
-    background: rgba(96, 165, 250, 0.14);
-    color: #b8d8ff;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
 }
 
 .provider-actions {
@@ -216,10 +216,10 @@
 
 .provider-action-btn {
     appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    background: var(--bg-card-strong);
     color: var(--text-primary);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 10px 14px;
     font: inherit;
     font-size: 13px;
@@ -229,9 +229,9 @@
 }
 
 .provider-action-btn:hover {
-    border-color: rgba(233, 69, 96, 0.35);
-    background: rgba(233, 69, 96, 0.14);
-    color: #fff4f6;
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: #f5fbff;
 }
 
 .provider-action-btn:disabled {
@@ -245,7 +245,7 @@
 .provider-empty-state {
     background: var(--bg-card);
     border: 1px dashed var(--border);
-    border-radius: 16px;
+    border-radius: 8px;
     padding: 44px 24px;
     text-align: center;
 }
@@ -286,7 +286,7 @@
 .provider-modal-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(3, 6, 19, 0.78);
+    background: rgba(0, 0, 0, 0.78);
     backdrop-filter: blur(6px);
 }
 
@@ -295,9 +295,9 @@
     width: min(900px, 100%);
     max-height: calc(100vh - 48px);
     overflow: auto;
-    background: linear-gradient(180deg, rgba(22, 33, 62, 0.98), rgba(15, 52, 96, 0.98));
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
 }
 
@@ -307,7 +307,7 @@
     align-items: flex-start;
     gap: 16px;
     padding: 24px 24px 18px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--border);
 }
 
 .provider-modal-title {
@@ -350,9 +350,9 @@
     gap: 10px;
     min-height: 46px;
     padding: 12px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(8, 15, 31, 0.36);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-inset);
     cursor: pointer;
     line-height: 1.5;
 }
@@ -379,9 +379,9 @@
 .provider-form-select,
 .provider-form-textarea {
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
-    background: rgba(8, 15, 31, 0.52);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-inset);
     color: var(--text-primary);
     font: inherit;
     padding: 12px 14px;
@@ -392,9 +392,9 @@
 .provider-form-input:focus,
 .provider-form-select:focus,
 .provider-form-textarea:focus {
-    border-color: rgba(233, 69, 96, 0.8);
-    box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.16);
-    background: rgba(8, 15, 31, 0.68);
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px rgba(52, 59, 60, 0.22);
+    background: var(--bg-card);
 }
 
 .provider-form-password {
@@ -411,10 +411,10 @@
     right: 10px;
     transform: translateY(-50%);
     appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    background: var(--bg-card-strong);
     color: var(--text-primary);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 7px 10px;
     font: inherit;
     font-size: 12px;
@@ -423,8 +423,8 @@
 }
 
 .provider-password-toggle:hover {
-    border-color: rgba(233, 69, 96, 0.35);
-    background: rgba(233, 69, 96, 0.14);
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
 }
 
 .provider-form-textarea {
@@ -434,22 +434,22 @@
 
 .provider-form-alert {
     padding: 12px 14px;
-    border-radius: 10px;
+    border-radius: 8px;
     font-size: 13px;
     line-height: 1.5;
 }
 
 .provider-form-alert.info {
-    background: rgba(59, 130, 246, 0.14);
-    border: 1px solid rgba(59, 130, 246, 0.22);
-    color: #bcd6ff;
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
 }
 
 .provider-form-actions {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--border);
     padding-top: 18px;
 }
 

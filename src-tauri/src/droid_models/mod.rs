@@ -10,11 +10,7 @@ const FACTORY_SETTINGS_FILE: &str = "settings.json";
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:8317";
 const DEFAULT_API_KEY: &str = "dummy-not-used";
 const DEFAULT_PROVIDER: &str = "anthropic";
-const ALLOWED_PROVIDERS: &[&str] = &[
-    "anthropic",
-    "openai",
-    "generic-chat-completion-api",
-];
+const ALLOWED_PROVIDERS: &[&str] = &["anthropic", "openai", "generic-chat-completion-api"];
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DroidCustomModelUpsertInput {
@@ -268,7 +264,9 @@ fn default_provider() -> String {
     DEFAULT_PROVIDER.to_string()
 }
 
-fn normalize_custom_model_input(input: DroidCustomModelUpsertInput) -> Result<DroidCustomModel, String> {
+fn normalize_custom_model_input(
+    input: DroidCustomModelUpsertInput,
+) -> Result<DroidCustomModel, String> {
     let model = input.model.trim().to_string();
     let id = input.id.trim().to_string();
     let display_name = if input.display_name.trim().is_empty() {
@@ -308,9 +306,7 @@ fn normalize_custom_model_input(input: DroidCustomModelUpsertInput) -> Result<Dr
         return Err("Provider 不能为空".to_string());
     }
     if !ALLOWED_PROVIDERS.contains(&provider.as_str()) {
-        return Err(
-            "Provider 只支持 anthropic、openai、generic-chat-completion-api".to_string(),
-        );
+        return Err("Provider 只支持 anthropic、openai、generic-chat-completion-api".to_string());
     }
 
     Ok(DroidCustomModel {
@@ -376,14 +372,14 @@ fn load_factory_settings_value() -> Result<Value, String> {
         return Ok(Value::Object(Map::new()));
     }
 
-    let raw = fs::read_to_string(&path)
-        .map_err(|error| format!("读取 {:?} 失败：{}", path, error))?;
+    let raw =
+        fs::read_to_string(&path).map_err(|error| format!("读取 {:?} 失败：{}", path, error))?;
     if raw.trim().is_empty() {
         return Ok(Value::Object(Map::new()));
     }
 
-    let value: Value = serde_json::from_str(&raw)
-        .map_err(|error| format!("解析 {:?} 失败：{}", path, error))?;
+    let value: Value =
+        serde_json::from_str(&raw).map_err(|error| format!("解析 {:?} 失败：{}", path, error))?;
     if !value.is_object() {
         return Err(format!("{:?} 的内容不是合法的 JSON 对象", path));
     }
@@ -397,8 +393,7 @@ fn save_factory_settings_value(settings: &Value) -> Result<(), String> {
         .parent()
         .ok_or_else(|| "无法定位 .factory 配置目录".to_string())?;
 
-    fs::create_dir_all(parent)
-        .map_err(|error| format!("创建 {:?} 失败：{}", parent, error))?;
+    fs::create_dir_all(parent).map_err(|error| format!("创建 {:?} 失败：{}", parent, error))?;
 
     let serialized = serde_json::to_string_pretty(settings)
         .map_err(|error| format!("序列化 settings.json 失败：{}", error))?;
@@ -440,7 +435,8 @@ fn write_custom_models(settings: &mut Value, models: &[DroidCustomModel]) -> Res
 
     root.insert(
         "customModels".to_string(),
-        serde_json::to_value(models).map_err(|error| format!("序列化 customModels 失败：{}", error))?,
+        serde_json::to_value(models)
+            .map_err(|error| format!("序列化 customModels 失败：{}", error))?,
     );
 
     Ok(())

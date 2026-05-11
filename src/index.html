@@ -13,17 +13,41 @@
     <div id="app">
         <nav class="sidebar">
             <div class="sidebar-header">
-                <img src="assets/icon.png" alt="TOAPIPROXY" class="logo">
+                <img src="assets/logo.svg" alt="TOAPIPROXY" class="logo">
                 <h1>ToAPI Proxy</h1>
             </div>
             <ul class="nav-list">
                 <li class="nav-item active" data-tab="general">
-                    <span class="icon">&#9881;</span>
+                    <span class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.88.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.88v.03a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"></path>
+                        </svg>
+                    </span>
                     <span>&#24120;&#35268;</span>
                 </li>
                 <li class="nav-item" data-tab="services">
-                    <span class="icon">&#9729;</span>
+                    <span class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12.5A4.5 4.5 0 0 1 9.5 8h.8A5.8 5.8 0 0 1 21 11.5 4.5 4.5 0 0 1 16.5 16H7a3 3 0 0 1-2-5.25"></path>
+                            <path d="M8 16h8"></path>
+                        </svg>
+                    </span>
                     <span>&#26381;&#21153;</span>
+                </li>
+                <li class="nav-item" data-tab="usage">
+                    <span class="icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 19.5h16"></path>
+                            <path d="M7 16V9"></path>
+                            <path d="M12 16V5"></path>
+                            <path d="M17 16v-4"></path>
+                            <rect x="5.5" y="9" width="3" height="7" rx="1"></rect>
+                            <rect x="10.5" y="5" width="3" height="11" rx="1"></rect>
+                            <rect x="15.5" y="12" width="3" height="4" rx="1"></rect>
+                        </svg>
+                    </span>
+                    <span>用量</span>
                 </li>
                 <li class="nav-item" data-tab="accounts">
                     <span class="icon" aria-hidden="true">
@@ -127,6 +151,27 @@
                 </div>
             </section>
 
+            <section id="usage" class="tab-content">
+                <div class="page-toolbar usage-toolbar">
+                    <div>
+                        <h2>用量统计</h2>
+                        <p class="usage-subtitle">本机代理请求统计</p>
+                    </div>
+                    <div class="page-toolbar-actions">
+                        <div class="usage-range-tabs" role="group" aria-label="用量时间范围">
+                            <button class="usage-range-tab active" data-usage-range="today">今天</button>
+                            <button class="usage-range-tab" data-usage-range="sevenDays">7 天</button>
+                            <button class="usage-range-tab" data-usage-range="thirtyDays">30 天</button>
+                            <button class="usage-range-tab" data-usage-range="all">全部</button>
+                        </div>
+                        <button id="refresh-usage-statistics" class="btn btn-secondary">刷新</button>
+                    </div>
+                </div>
+                <div id="usage-statistics-content" class="usage-statistics-content">
+                    <div class="usage-empty-state">暂无用量数据</div>
+                </div>
+            </section>
+
             <section id="accounts" class="tab-content">
                 <h2>&#36134;&#25143;&#31649;&#29702;</h2>
                 <div class="page-toolbar">
@@ -160,12 +205,17 @@
                 <div class="page-toolbar">
                     <div class="page-tabs" id="config-page-tabs">
                         <button class="page-tab active" data-page-group="config" data-page-target="claude">Claude</button>
+                        <button class="page-tab" data-page-group="config" data-page-target="codex">Codex</button>
                         <button class="page-tab" data-page-group="config" data-page-target="droid">Droid</button>
                     </div>
                     <div class="page-toolbar-actions providers-page-actions">
                         <div class="page-toolbar-actions-pane active" data-page-group="config" data-page-pane-actions="claude">
                             <button id="refresh-claude-providers" class="btn btn-secondary">&#21047;&#26032;</button>
                             <button id="add-claude-provider" class="btn btn-primary">&#26032;&#22686;&#37197;&#32622;&#26723;&#26696;</button>
+                        </div>
+                        <div class="page-toolbar-actions-pane" data-page-group="config" data-page-pane-actions="codex">
+                            <button id="refresh-codex-configs" class="btn btn-secondary">&#21047;&#26032;</button>
+                            <button id="add-codex-config" class="btn btn-primary">&#26032;&#22686;&#37197;&#32622;&#26723;&#26696;</button>
                         </div>
                         <div class="page-toolbar-actions-pane" data-page-group="config" data-page-pane-actions="droid">
                             <button id="refresh-droid-models" class="btn btn-secondary">&#21047;&#26032;</button>
@@ -180,6 +230,12 @@
                         <!-- Claude providers will be rendered by JS -->
                     </div>
                 </div>
+                <div id="config-pane-codex" class="page-pane" data-page-group="config" data-page-pane="codex">
+                    <div id="codex-configs-notice" class="provider-inline-notice" style="display: none;"></div>
+                    <div id="codex-configs-list" class="provider-list">
+                        <!-- Codex configs will be rendered by JS -->
+                    </div>
+                </div>
                 <div id="config-pane-droid" class="page-pane" data-page-group="config" data-page-pane="droid">
                     <div id="droid-models-notice" class="provider-inline-notice" style="display: none;"></div>
                     <div id="droid-models-list" class="provider-list">
@@ -190,7 +246,7 @@
 
             <section id="about" class="tab-content">
                 <div class="about-content">
-                    <img src="assets/icon.png" alt="TOAPIPROXY" class="about-logo">
+                    <img src="assets/logo.svg" alt="TOAPIPROXY" class="about-logo">
                     <h2>ToAPI Proxy</h2>
                     <p class="version">v0.1.0</p>
                     <p class="description">一个本地AI API代理服务 仅供个人学习使用</p>
@@ -228,7 +284,7 @@
     <script src="codex-overrides.js" defer></script>
     <script src="services-overrides.js" defer></script>
     <script src="claude-providers.js" defer></script>
+    <script src="codex-config.js" defer></script>
     <script src="droid-models.js" defer></script>
 </body>
 </html>
-
