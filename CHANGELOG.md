@@ -17,12 +17,13 @@
 ### Changed
 - 统一桌面端、Tauri 配置和 Cargo 清单中的应用版本号来源。
 - 补充 `.gitignore`，忽略本地临时目录、构建产物和内嵌依赖目录。
+- 将内嵌后端切换为 `CLIProxyAPI`。
 
 ## [0.1.0] - 2026-04-19
 
 ### Added
 - 发布基于 Tauri 2.x 的 TOAPIPROXY 桌面应用，提供统一的本地 AI 代理入口。
-- 集成 `CLIProxyAPIPlus` 后端服务，并支持桌面端自动启动代理栈。
+- 集成 `CLIProxyAPI` 后端服务，并支持桌面端自动启动代理栈。
 - 提供服务管理界面，覆盖 Claude、Codex、Gemini、GitHub Copilot、Qwen、Kiro、Antigravity 等服务入口。
 - 提供 Kiro 与 Codex 账户管理页面，支持导入、删除、刷新和账户状态查看。
 - 支持本地代理端口转发，默认通过 `8317 -> 8318` 暴露服务。
@@ -39,5 +40,5 @@
 - 修复开发模式下导入或删除 Codex 账户时因直接改写打包配置文件导致 Tauri 自动重建、看起来像“应用重启”的问题。
 - 修复 `Import Current Codex` 过程中可能立即中断的代理链路问题，并恢复 `8317 -> 8318` 的代理转发启动逻辑。
 - 修复 `thinking_proxy` 在缺少 Tokio runtime 上下文时触发 panic 的问题。
-- 修复构建脚本在本地开发服务占用 `cli-proxy-api-plus.exe` 时无法替换二进制的问题。
+- 修复构建脚本在本地开发服务占用 `cli-proxy-api.exe` 时无法替换二进制的问题。
 - 修复 Go 构建阶段的 VCS stamping 错误，保证本地和发布构建可以稳定完成。
