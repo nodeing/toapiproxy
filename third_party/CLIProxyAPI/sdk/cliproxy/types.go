@@ -6,9 +6,9 @@ package cliproxy
 import (
 	"context"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/watcher"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/watcher"
+	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+	"github.com/router-for-me/CLIProxyAPI/v7/sdk/config"
 )
 
 // TokenClientProvider loads clients backed by stored authentication tokens.
@@ -89,7 +89,6 @@ type WatcherWrapper struct {
 	snapshotAuths         func() []*coreauth.Auth
 	setUpdateQueue        func(queue chan<- watcher.AuthUpdate)
 	dispatchRuntimeUpdate func(update watcher.AuthUpdate) bool
-	notifyTokenRefreshed  func(tokenID, accessToken, refreshToken, expiresAt string) // 方案 A: 后台刷新通知
 }
 
 // Start proxies to the underlying watcher Start implementation.
@@ -146,17 +145,4 @@ func (w *WatcherWrapper) SetAuthUpdateQueue(queue chan<- watcher.AuthUpdate) {
 		return
 	}
 	w.setUpdateQueue(queue)
-}
-
-// NotifyTokenRefreshed 通知 Watcher 后台刷新器已更新 token
-// 这是方案 A 的核心方法，用于解决后台刷新与内存 Auth 对象的时间差问题
-// tokenID: token 文件名（如 kiro-xxx.json）
-// accessToken: 新的 access token
-// refreshToken: 新的 refresh token
-// expiresAt: 新的过期时间（RFC3339 格式）
-func (w *WatcherWrapper) NotifyTokenRefreshed(tokenID, accessToken, refreshToken, expiresAt string) {
-	if w == nil || w.notifyTokenRefreshed == nil {
-		return
-	}
-	w.notifyTokenRefreshed(tokenID, accessToken, refreshToken, expiresAt)
 }

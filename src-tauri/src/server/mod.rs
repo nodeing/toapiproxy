@@ -1,5 +1,6 @@
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
@@ -18,6 +19,7 @@ pub struct ProxyServer {
     logs: Mutex<Vec<String>>,
     binary_path: Mutex<Option<PathBuf>>,
     config_path: Mutex<Option<PathBuf>>,
+    pid_file_path: Mutex<Option<PathBuf>>,
 }
 
 impl ProxyServer {
@@ -30,6 +32,7 @@ impl ProxyServer {
             logs: Mutex::new(Vec::new()),
             binary_path: Mutex::new(None),
             config_path: Mutex::new(None),
+            pid_file_path: Mutex::new(None),
         }
     }
 
@@ -54,6 +57,12 @@ impl ProxyServer {
 
     pub fn set_config_path(&self, path: PathBuf) {
         if let Ok(mut p) = self.config_path.lock() {
+            *p = Some(path);
+        }
+    }
+
+    pub fn set_pid_file_path(&self, path: PathBuf) {
+        if let Ok(mut p) = self.pid_file_path.lock() {
             *p = Some(path);
         }
     }
@@ -110,7 +119,6 @@ impl ProxyServer {
             return Err("Server already running".into());
         }
 
-        self.kill_orphans();
         let bin = self.binary_path.lock().ok().and_then(|p| p.clone());
         let cfg = self.config_path.lock().ok().and_then(|p| p.clone());
 
@@ -125,6 +133,8 @@ impl ProxyServer {
 
         let bin = bin.unwrap();
         let cfg = cfg.unwrap();
+        self.cleanup_recorded_backend_process(&bin);
+
         self.add_log(format!(
             "Starting backend server on port {} (proxy port {})...",
             self.backend_port, self.proxy_port
@@ -143,7 +153,7 @@ impl ProxyServer {
             #[cfg(windows)]
             if e.raw_os_error() == Some(216) {
                 return format!(
-                    "Spawn failed: {}. The bundled cli-proxy-api-plus.exe is likely built for a different CPU architecture than this machine. Rebuild the backend for the current host with `make build-cli-proxy` or rerun `make dev`.",
+                    "Spawn failed: {}. The bundled cli-proxy-api.exe is likely built for a different CPU architecture than this machine. Rebuild the backend for the current host with `make build-cli-proxy` or rerun `make dev`.",
                     e
                 );
             }
@@ -152,6 +162,7 @@ impl ProxyServer {
         })?;
 
         let pid = child.id();
+        self.record_backend_pid(pid);
         self.add_log(format!("✓ Server started (PID: {})", pid));
 
         if let Some(out) = child.stdout.take() {
@@ -178,6 +189,7 @@ impl ProxyServer {
             self.add_log(format!("Stopping server (PID: {})...", c.id()));
             let _ = c.kill();
             let _ = c.wait();
+            self.clear_backend_pid();
             self.add_log("✓ Server stopped".into());
         }
         Ok(())
@@ -191,23 +203,92 @@ impl ProxyServer {
         self.backend_port
     }
 
-    fn kill_orphans(&self) {
-        #[cfg(windows)]
-        {
-            let mut cmd = Command::new("taskkill");
-            cmd.args(["/F", "/IM", "cli-proxy-api-plus.exe"])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null());
-            cmd.creation_flags(CREATE_NO_WINDOW);
-            let _ = cmd.status();
+    fn pid_file_path(&self) -> Option<PathBuf> {
+        self.pid_file_path.lock().ok().and_then(|p| p.clone())
+    }
+
+    fn record_backend_pid(&self, pid: u32) {
+        let Some(path) = self.pid_file_path() else {
+            return;
+        };
+
+        if let Some(parent) = path.parent() {
+            if let Err(err) = fs::create_dir_all(parent) {
+                log::warn!("Failed to create backend PID directory: {}", err);
+                return;
+            }
         }
 
-        #[cfg(not(windows))]
-        let _ = Command::new("pkill")
-            .args(["-9", "-f", "cli-proxy-api-plus"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+        if let Err(err) = fs::write(&path, pid.to_string()) {
+            log::warn!("Failed to write backend PID file {:?}: {}", path, err);
+        }
+    }
+
+    fn clear_backend_pid(&self) {
+        let Some(path) = self.pid_file_path() else {
+            return;
+        };
+
+        if let Err(err) = fs::remove_file(&path) {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("Failed to remove backend PID file {:?}: {}", path, err);
+            }
+        }
+    }
+
+    fn cleanup_recorded_backend_process(&self, expected_binary: &Path) {
+        let Some(path) = self.pid_file_path() else {
+            return;
+        };
+
+        let pid_text = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(err) => {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    log::warn!("Failed to read backend PID file {:?}: {}", path, err);
+                    self.clear_backend_pid();
+                }
+                return;
+            }
+        };
+
+        let Ok(pid) = pid_text.trim().parse::<u32>() else {
+            log::warn!("Ignoring invalid backend PID file {:?}", path);
+            self.clear_backend_pid();
+            return;
+        };
+
+        if pid == std::process::id() {
+            self.clear_backend_pid();
+            return;
+        }
+
+        let Some(actual_binary) = process_executable_path(pid) else {
+            self.clear_backend_pid();
+            return;
+        };
+
+        if !same_executable_path(&actual_binary, expected_binary) {
+            log::warn!(
+                "Skipping backend cleanup for PID {} because executable path does not match: {:?}",
+                pid,
+                actual_binary
+            );
+            self.clear_backend_pid();
+            return;
+        }
+
+        self.add_log(format!(
+            "Cleaning previous backend process (PID: {})...",
+            pid
+        ));
+        terminate_process(pid);
+        wait_until_process_exits(pid, std::time::Duration::from_millis(1500));
+        if process_executable_path(pid).is_some() {
+            force_terminate_process(pid);
+            wait_until_process_exits(pid, std::time::Duration::from_millis(1500));
+        }
+        self.clear_backend_pid();
     }
 
     /// 运行认证命令，返回 (成功, 消息, 可选的设备码)
@@ -237,14 +318,16 @@ impl ProxyServer {
         let (arg, needs_input) = match svc {
             "claude" => ("-claude-login", false),
             "codex" => ("-codex-login", false),
-            "copilot" => ("-github-copilot-login", false),
             "gemini" => ("-login", true), // 需要发送回车确认
-            "kiro" | "kiro-aws" => ("-kiro-aws-login", false),
-            "kiro-google" => ("-kiro-google-login", false),
-            "kiro-github" => ("-kiro-github-login", false),
-            "kiro-import" => ("-kiro-import", false),
-            "qwen" => ("-qwen-login", true), // 需要输入邮箱
             "antigravity" => ("-antigravity-login", false),
+            "kimi" => ("-kimi-login", false),
+            "copilot" | "kiro" | "kiro-aws" | "kiro-google" | "kiro-github" | "kiro-import"
+            | "qwen" => {
+                return Err(format!(
+                    "{} login is not supported by the bundled CLIProxyAPI backend.",
+                    svc
+                ))
+            }
             _ => return Err(format!("Unknown service: {}", svc)),
         };
 
@@ -367,8 +450,183 @@ pub struct AuthResult {
     pub device_code: Option<String>,
 }
 
+fn same_executable_path(actual: &Path, expected: &Path) -> bool {
+    let actual = fs::canonicalize(actual).unwrap_or_else(|_| actual.to_path_buf());
+    let expected = fs::canonicalize(expected).unwrap_or_else(|_| expected.to_path_buf());
+
+    #[cfg(windows)]
+    {
+        normalize_windows_path(&actual).eq_ignore_ascii_case(&normalize_windows_path(&expected))
+    }
+
+    #[cfg(not(windows))]
+    {
+        actual == expected
+    }
+}
+
+#[cfg(windows)]
+fn normalize_windows_path(path: &Path) -> String {
+    path.to_string_lossy().replace('/', "\\")
+}
+
+#[cfg(target_os = "linux")]
+fn process_executable_path(pid: u32) -> Option<PathBuf> {
+    fs::read_link(format!("/proc/{}/exe", pid)).ok()
+}
+
+#[cfg(target_os = "macos")]
+fn process_executable_path(pid: u32) -> Option<PathBuf> {
+    use std::os::raw::c_void;
+
+    const PROC_PIDPATHINFO_MAXSIZE: usize = 4096;
+
+    extern "C" {
+        fn proc_pidpath(pid: i32, buffer: *mut c_void, buffersize: u32) -> i32;
+    }
+
+    let mut buffer = [0_u8; PROC_PIDPATHINFO_MAXSIZE];
+    let len = unsafe {
+        proc_pidpath(
+            pid as i32,
+            buffer.as_mut_ptr() as *mut c_void,
+            buffer.len() as u32,
+        )
+    };
+
+    if len <= 0 {
+        return None;
+    }
+
+    Some(PathBuf::from(
+        String::from_utf8_lossy(&buffer[..len as usize]).to_string(),
+    ))
+}
+
+#[cfg(windows)]
+fn process_executable_path(pid: u32) -> Option<PathBuf> {
+    let script = format!(
+        "$p = Get-Process -Id {} -ErrorAction SilentlyContinue; if ($p) {{ $p.Path }}",
+        pid
+    );
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if path.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(path))
+    }
+}
+
+#[cfg(all(not(windows), not(target_os = "macos"), not(target_os = "linux")))]
+fn process_executable_path(_pid: u32) -> Option<PathBuf> {
+    None
+}
+
+fn terminate_process(pid: u32) {
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("taskkill");
+        cmd.args(["/F", "/PID", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        let _ = cmd.status();
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = Command::new("kill")
+            .args(["-TERM", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn force_terminate_process(pid: u32) {
+    #[cfg(windows)]
+    {
+        terminate_process(pid);
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = Command::new("kill")
+            .args(["-KILL", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn wait_until_process_exits(pid: u32, timeout: std::time::Duration) {
+    let started = std::time::Instant::now();
+    while started.elapsed() < timeout {
+        if process_executable_path(pid).is_none() {
+            return;
+        }
+        thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
 impl Drop for ProxyServer {
     fn drop(&mut self) {
         let _ = self.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    #[cfg(not(windows))]
+    #[test]
+    fn cleanup_skips_pid_when_executable_path_does_not_match() {
+        let test_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let test_dir = std::env::temp_dir().join(format!(
+            "toapiproxy-backend-pid-test-{}-{}",
+            std::process::id(),
+            test_id
+        ));
+        fs::create_dir_all(&test_dir).unwrap();
+
+        let expected_backend = test_dir.join("cli-proxy-api");
+        fs::write(&expected_backend, "").unwrap();
+
+        let pid_file = test_dir.join("cli-proxy-api.pid");
+        let mut external_process = Command::new("sleep")
+            .arg("30")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+
+        fs::write(&pid_file, external_process.id().to_string()).unwrap();
+
+        let server = ProxyServer::new(8317, 8318);
+        server.set_pid_file_path(pid_file);
+        server.cleanup_recorded_backend_process(&expected_backend);
+
+        thread::sleep(Duration::from_millis(100));
+        assert!(external_process.try_wait().unwrap().is_none());
+
+        let _ = external_process.kill();
+        let _ = external_process.wait();
+        let _ = fs::remove_dir_all(test_dir);
     }
 }

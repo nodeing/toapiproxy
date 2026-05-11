@@ -574,7 +574,7 @@ impl CodexClient {
                 }
             }
             Err(_) => Err(format!(
-                "Unable to connect to CLIProxyAPIPlus backend on port {}.",
+                "Unable to connect to CLIProxyAPI backend on port {}.",
                 BACKEND_PORT
             )),
         }
@@ -710,7 +710,7 @@ impl CodexClient {
                 }
             }
             Err(_) => Err(format!(
-                "Unable to connect to CLIProxyAPIPlus backend on port {}.",
+                "Unable to connect to CLIProxyAPI backend on port {}.",
                 BACKEND_PORT
             )),
         }

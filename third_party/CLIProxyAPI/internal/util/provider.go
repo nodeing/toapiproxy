@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -56,12 +56,6 @@ func GetProviderName(modelName string) []string {
 		return providers
 	}
 
-	// Fallback: if cursor provider has registered models, route unknown models to it.
-	// Cursor acts as a universal proxy supporting multiple model families (Claude, GPT, Gemini, etc.).
-	if models := registry.GetGlobalRegistry().GetAvailableModelsByProvider("cursor"); len(models) > 0 {
-		return []string{"cursor"}
-	}
-
 	return providers
 }
 
@@ -104,6 +98,9 @@ func IsOpenAICompatibilityAlias(modelName string, cfg *config.Config) bool {
 	}
 
 	for _, compat := range cfg.OpenAICompatibility {
+		if compat.Disabled {
+			continue
+		}
 		for _, model := range compat.Models {
 			if model.Alias == modelName {
 				return true
@@ -129,6 +126,9 @@ func GetOpenAICompatibilityConfig(alias string, cfg *config.Config) (*config.Ope
 	}
 
 	for _, compat := range cfg.OpenAICompatibility {
+		if compat.Disabled {
+			continue
+		}
 		for _, model := range compat.Models {
 			if model.Alias == alias {
 				return &compat, &model

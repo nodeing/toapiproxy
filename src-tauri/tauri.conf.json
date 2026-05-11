@@ -11,9 +11,9 @@
     "windows": [
       {
         "title": "ToAPI Proxy",
-        "width": 1080,
+        "width": 980,
         "height": 650,
-        "minWidth": 1080,
+        "minWidth": 900,
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,

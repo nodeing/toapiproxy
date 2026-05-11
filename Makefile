@@ -38,7 +38,7 @@ help:
 	@echo "  make build           - Build installer"
 	@echo "  make dev             - Run in development mode"
 	@echo "  make clean           - Clean build artifacts"
-	@echo "  make build-cli-proxy - Build CLIProxyAPIPlus binary only"
+	@echo "  make build-cli-proxy - Build CLIProxyAPI binary only"
 	@echo "  make build-win             - Build both Windows installers into build/dist"
 	@echo "  make build-mac             - Build both macOS DMGs into build/dist"
 	@echo "  make build-windows-x64     - Build Windows NSIS installer for x64"

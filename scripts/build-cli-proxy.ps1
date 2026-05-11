@@ -6,14 +6,13 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$cliProjectDir = Join-Path $repoRoot "third_party\CLIProxyAPIPlus"
-$binaryName = "cli-proxy-api-plus.exe"
+$cliProjectDir = Join-Path $repoRoot "third_party\CLIProxyAPI"
+$binaryName = "cli-proxy-api.exe"
 $outputPath = Join-Path $repoRoot ("src-tauri\resources\" + $binaryName)
-$tempOutputPath = Join-Path $repoRoot ("src-tauri\resources\cli-proxy-api-plus.build.exe")
+$tempOutputPath = Join-Path $repoRoot ("src-tauri\resources\cli-proxy-api.build.exe")
 $goCacheRoot = Join-Path $repoRoot ".cache\go"
 $goBuildCache = Join-Path $goCacheRoot "build"
 $goModCache = Join-Path $goCacheRoot "mod"
-$binaryProcessName = "cli-proxy-api-plus"
 $artifactDir = Join-Path $repoRoot "build\backend"
 
 function Resolve-DefaultTargetTriple {
@@ -72,16 +71,23 @@ function Resolve-GoTarget {
 
 function Stop-RunningBinaryProcesses {
     param(
-        [string]$ProcessName
+        [string]$ProcessPath
     )
 
-    $running = @(Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)
+    $targetPath = [System.IO.Path]::GetFullPath($ProcessPath)
+    $running = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        try {
+            $_.Path -and ([System.IO.Path]::GetFullPath($_.Path) -ieq $targetPath)
+        } catch {
+            $false
+        }
+    })
     if ($running.Count -eq 0) {
         return
     }
 
     $processIds = $running | Select-Object -ExpandProperty Id
-    Write-Host "Stopping running $ProcessName processes: $($processIds -join ', ')"
+    Write-Host "Stopping processes using $targetPath: $($processIds -join ', ')"
     $running | Stop-Process -Force -ErrorAction Stop
 
     foreach ($processId in $processIds) {
@@ -92,12 +98,12 @@ function Stop-RunningBinaryProcesses {
     }
 }
 
-function Get-CLIProxyAPIPlusCommit {
+function Get-CLIProxyAPICommit {
     param(
         [string]$RepoRoot
     )
 
-    $subtreePath = "third_party/CLIProxyAPIPlus"
+    $subtreePath = "third_party/CLIProxyAPI"
 
     try {
         $subtreeMessage = git -C $RepoRoot log `
@@ -129,17 +135,17 @@ function Get-CLIProxyAPIPlusCommit {
 }
 
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
-    throw "go command not found. Install Go before building CLIProxyAPIPlus."
+    throw "go command not found. Install Go before building CLIProxyAPI."
 }
 
 if (-not (Test-Path $cliProjectDir)) {
-    throw "CLIProxyAPIPlus project not found at $cliProjectDir"
+    throw "CLIProxyAPI project not found at $cliProjectDir"
 }
 
 New-Item -ItemType Directory -Force (Split-Path -Parent $outputPath) | Out-Null
 
 $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
-$commit = Get-CLIProxyAPIPlusCommit -RepoRoot $repoRoot
+$commit = Get-CLIProxyAPICommit -RepoRoot $repoRoot
 
 $env:CGO_ENABLED = "0"
 $env:GOTOOLCHAIN = "local"
@@ -151,14 +157,14 @@ New-Item -ItemType Directory -Force $goModCache | Out-Null
 New-Item -ItemType Directory -Force $artifactDir | Out-Null
 
 $goTarget = Resolve-GoTarget -TargetTriple $resolvedTarget
-$artifactPath = Join-Path $artifactDir ("cli-proxy-api-plus-" + $resolvedTarget + ".exe")
+$artifactPath = Join-Path $artifactDir ("cli-proxy-api-" + $resolvedTarget + ".exe")
 
-Write-Host "Building CLIProxyAPIPlus from $cliProjectDir for $resolvedTarget"
+Write-Host "Building CLIProxyAPI from $cliProjectDir for $resolvedTarget"
 if (Test-Path $tempOutputPath) {
     Remove-Item $tempOutputPath -Force
 }
 
-Stop-RunningBinaryProcesses -ProcessName $binaryProcessName
+Stop-RunningBinaryProcesses -ProcessPath $outputPath
 
 Push-Location $cliProjectDir
 try {
@@ -171,14 +177,14 @@ try {
         -o $tempOutputPath `
         .\cmd\server
     if ($LASTEXITCODE -ne 0) {
-        throw "CLIProxyAPIPlus build failed. Ensure the installed Go toolchain satisfies third_party/CLIProxyAPIPlus/go.mod."
+        throw "CLIProxyAPI build failed. Ensure the installed Go toolchain satisfies third_party/CLIProxyAPI/go.mod."
     }
 } finally {
     Pop-Location
 }
 
 if (-not (Test-Path $tempOutputPath)) {
-    throw "CLIProxyAPIPlus build did not produce $tempOutputPath"
+    throw "CLIProxyAPI build did not produce $tempOutputPath"
 }
 
 if (Test-Path $outputPath) {
@@ -192,9 +198,9 @@ if (Test-Path $outputPath) {
 try {
     Move-Item $tempOutputPath $outputPath
 } catch {
-    throw "Failed to move the new CLIProxyAPIPlus binary into place. $($_.Exception.Message)"
+    throw "Failed to move the new CLIProxyAPI binary into place. $($_.Exception.Message)"
 }
 
-Write-Host "CLIProxyAPIPlus binary updated at $outputPath"
+Write-Host "CLIProxyAPI binary updated at $outputPath"
 Copy-Item $outputPath $artifactPath -Force
 Write-Host "Target artifact cached at $artifactPath"

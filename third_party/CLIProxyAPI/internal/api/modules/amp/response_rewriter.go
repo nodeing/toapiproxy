@@ -36,8 +36,6 @@ func NewResponseRewriter(w gin.ResponseWriter, originalModel string) *ResponseRe
 const maxBufferedResponseBytes = 2 * 1024 * 1024 // 2MB safety cap
 
 func looksLikeSSEChunk(data []byte) bool {
-	// Fallback detection: some upstreams may omit/lie about Content-Type, causing SSE to be buffered.
-	// We conservatively detect SSE by checking for "data:" / "event:" at the start of any line.
 	for _, line := range bytes.Split(data, []byte("\n")) {
 		trimmed := bytes.TrimSpace(line)
 		if bytes.HasPrefix(trimmed, []byte("data:")) ||
@@ -54,10 +52,8 @@ func (rw *ResponseRewriter) enableStreaming(reason string) error {
 	}
 	rw.isStreaming = true
 
-	// Flush any previously buffered data to avoid reordering or data loss.
 	if rw.body != nil && rw.body.Len() > 0 {
 		buf := rw.body.Bytes()
-		// Copy before Reset() to keep bytes stable.
 		toFlush := make([]byte, len(buf))
 		copy(toFlush, buf)
 		rw.body.Reset()
@@ -74,9 +70,7 @@ func (rw *ResponseRewriter) enableStreaming(reason string) error {
 	return nil
 }
 
-// Write intercepts response writes and buffers them for model name replacement
 func (rw *ResponseRewriter) Write(data []byte) (int, error) {
-	// Detect streaming on first write (header-based)
 	if !rw.isStreaming && rw.body.Len() == 0 {
 		contentType := rw.Header().Get("Content-Type")
 		rw.isStreaming = strings.Contains(contentType, "text/event-stream") ||
@@ -84,13 +78,11 @@ func (rw *ResponseRewriter) Write(data []byte) (int, error) {
 	}
 
 	if !rw.isStreaming {
-		// Content-based fallback: detect SSE-like chunks even if Content-Type is missing/wrong.
 		if looksLikeSSEChunk(data) {
 			if err := rw.enableStreaming("sse heuristic"); err != nil {
 				return 0, err
 			}
 		} else if rw.body.Len()+len(data) > maxBufferedResponseBytes {
-			// Safety cap: avoid unbounded buffering on large responses.
 			log.Warnf("amp response rewriter: buffer exceeded %d bytes, switching to streaming", maxBufferedResponseBytes)
 			if err := rw.enableStreaming("buffer limit"); err != nil {
 				return 0, err
@@ -130,6 +122,52 @@ func (rw *ResponseRewriter) Flush() {
 }
 
 var modelFieldPaths = []string{"message.model", "model", "modelVersion", "response.model", "response.modelVersion"}
+
+// ampCanonicalToolNames maps tool names to the exact casing expected by the
+// Amp mode tool whitelist (case-sensitive match).
+var ampCanonicalToolNames = map[string]string{
+	"bash":  "Bash",
+	"read":  "Read",
+	"grep":  "Grep",
+	"glob":  "glob",
+	"task":  "Task",
+	"check": "Check",
+}
+
+// normalizeAmpToolNames fixes tool_use block names to match Amp's canonical casing.
+// Some upstream models return lowercase tool names (e.g. "bash" instead of "Bash")
+// which causes Amp's case-sensitive mode whitelist to reject them.
+func normalizeAmpToolNames(data []byte) []byte {
+	// Non-streaming: content[].name in tool_use blocks
+	for index, block := range gjson.GetBytes(data, "content").Array() {
+		if block.Get("type").String() != "tool_use" {
+			continue
+		}
+		name := block.Get("name").String()
+		if canonical, ok := ampCanonicalToolNames[strings.ToLower(name)]; ok && name != canonical {
+			path := fmt.Sprintf("content.%d.name", index)
+			var err error
+			data, err = sjson.SetBytes(data, path, canonical)
+			if err != nil {
+				log.Warnf("Amp ResponseRewriter: failed to normalize tool name %q to %q: %v", name, canonical, err)
+			}
+		}
+	}
+
+	// Streaming: content_block.name in content_block_start events
+	if gjson.GetBytes(data, "content_block.type").String() == "tool_use" {
+		name := gjson.GetBytes(data, "content_block.name").String()
+		if canonical, ok := ampCanonicalToolNames[strings.ToLower(name)]; ok && name != canonical {
+			var err error
+			data, err = sjson.SetBytes(data, "content_block.name", canonical)
+			if err != nil {
+				log.Warnf("Amp ResponseRewriter: failed to normalize streaming tool name %q to %q: %v", name, canonical, err)
+			}
+		}
+	}
+
+	return data
+}
 
 // ensureAmpSignature injects empty signature fields into tool_use/thinking blocks
 // in API responses so that the Amp TUI does not crash on P.signature.length.
@@ -187,6 +225,7 @@ func (rw *ResponseRewriter) suppressAmpThinking(data []byte) []byte {
 
 func (rw *ResponseRewriter) rewriteModelInResponse(data []byte) []byte {
 	data = ensureAmpSignature(data)
+	data = normalizeAmpToolNames(data)
 	data = rw.suppressAmpThinking(data)
 	if len(data) == 0 {
 		return data
@@ -285,6 +324,9 @@ func (rw *ResponseRewriter) rewriteStreamChunk(chunk []byte) []byte {
 func (rw *ResponseRewriter) rewriteStreamEvent(data []byte) []byte {
 	// Inject empty signature where needed
 	data = ensureAmpSignature(data)
+
+	// Normalize tool names to canonical casing
+	data = normalizeAmpToolNames(data)
 
 	// Rewrite model name
 	if rw.originalModel != "" {

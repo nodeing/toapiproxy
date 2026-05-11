@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
+	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 )
 
 // schedulerStrategy identifies which built-in routing semantics the scheduler should apply.
@@ -656,11 +656,6 @@ func (p *providerScheduler) ensureModelLocked(modelKey string, now time.Time) *m
 func (m *scheduledAuthMeta) supportsModel(modelKey string) bool {
 	modelKey = canonicalModelKey(modelKey)
 	if modelKey == "" {
-		return true
-	}
-	// Cursor acts as a universal proxy supporting multiple model families.
-	// Allow any model to be routed to cursor auth.
-	if m.providerKey == "cursor" {
 		return true
 	}
 	if len(m.supportedModelSet) == 0 {

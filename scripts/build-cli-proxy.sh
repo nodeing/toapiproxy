@@ -6,8 +6,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/build-cli-proxy.sh [--target <triple>] [--output <path>]
 
-Builds the bundled CLIProxyAPIPlus backend binary for the requested target and
-copies it to src-tauri/resources/cli-proxy-api-plus by default.
+Builds the bundled CLIProxyAPI backend binary for the requested target and
+copies it to src-tauri/resources/cli-proxy-api by default.
 
 Supported targets:
   aarch64-apple-darwin
@@ -25,7 +25,7 @@ EOF
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-cli_project_dir="$repo_root/third_party/CLIProxyAPIPlus"
+cli_project_dir="$repo_root/third_party/CLIProxyAPI"
 resources_dir="$repo_root/src-tauri/resources"
 go_cache_root="$repo_root/.cache/go"
 go_build_cache="$go_cache_root/build"
@@ -65,7 +65,7 @@ require_command() {
 }
 
 resolve_cli_proxy_commit() {
-  local subtree_path="third_party/CLIProxyAPIPlus"
+  local subtree_path="third_party/CLIProxyAPI"
   local subtree_message
   local split_commit
   local path_commit
@@ -163,7 +163,7 @@ build_single_target() {
 
   mkdir -p "$(dirname "$out_path")"
 
-  echo "Building CLIProxyAPIPlus for $triple (GOOS=$goos GOARCH=$goarch)"
+  echo "Building CLIProxyAPI for $triple (GOOS=$goos GOARCH=$goarch)"
   (
     cd "$cli_project_dir"
     CGO_ENABLED=0 \
@@ -185,8 +185,8 @@ build_single_target() {
 build_universal_macos_binary() {
   local out_path="$1"
   local tmp_dir="$2"
-  local arm_out="$tmp_dir/cli-proxy-api-plus-aarch64-apple-darwin"
-  local intel_out="$tmp_dir/cli-proxy-api-plus-x86_64-apple-darwin"
+  local arm_out="$tmp_dir/cli-proxy-api-aarch64-apple-darwin"
+  local intel_out="$tmp_dir/cli-proxy-api-x86_64-apple-darwin"
 
   require_command lipo
 
@@ -201,12 +201,12 @@ build_universal_macos_binary() {
 require_command go
 
 if [[ ! -d "$cli_project_dir" ]]; then
-  echo "CLIProxyAPIPlus project not found at $cli_project_dir" >&2
+  echo "CLIProxyAPI project not found at $cli_project_dir" >&2
   exit 1
 fi
 
 target_triple="${target_triple:-$(detect_host_target)}"
-output_path="${output_path:-$resources_dir/cli-proxy-api-plus}"
+output_path="${output_path:-$resources_dir/cli-proxy-api}"
 
 mkdir -p "$resources_dir" "$go_build_cache" "$go_mod_cache" "$artifact_dir"
 
@@ -216,7 +216,7 @@ commit="$(resolve_cli_proxy_commit)"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/toapiproxy-cli-build.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-artifact_path="$artifact_dir/cli-proxy-api-plus-$target_triple"
+artifact_path="$artifact_dir/cli-proxy-api-$target_triple"
 
 if [[ "$target_triple" == "universal-apple-darwin" ]]; then
   build_universal_macos_binary "$artifact_path" "$tmp_dir"
@@ -227,5 +227,5 @@ fi
 cp "$artifact_path" "$output_path"
 chmod +x "$output_path"
 
-echo "CLIProxyAPIPlus binary updated at $output_path"
+echo "CLIProxyAPI binary updated at $output_path"
 echo "Target artifact cached at $artifact_path"

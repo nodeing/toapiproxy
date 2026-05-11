@@ -1,7 +1,7 @@
 //! ThinkingProxy - HTTP 代理层，用于处理 Claude 模型的 thinking 参数
 //!
 //! 功能：
-//! 1. 监听 8317 端口，转发请求到 8318 端口的 CLIProxyAPIPlus
+//! 1. 监听 8317 端口，转发请求到 8318 端口的 CLIProxyAPI
 //! 2. 解析模型名称中的 `-thinking-NUMBER` 后缀，添加 thinking 参数
 //! 3. 转发 Amp CLI 管理请求到 ampcode.com
 
@@ -446,7 +446,8 @@ mod tests {
         );
 
         let rewritten = String::from_utf8(
-            process_thinking_parameter(request.as_bytes()).expect("thinking rewrite should succeed"),
+            process_thinking_parameter(request.as_bytes())
+                .expect("thinking rewrite should succeed"),
         )
         .expect("request should stay utf-8");
 

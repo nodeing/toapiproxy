@@ -13,13 +13,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 
 	"github.com/gin-gonic/gin"
-	. "github.com/router-for-me/CLIProxyAPI/v6/internal/constant"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
-	responsesconverter "github.com/router-for-me/CLIProxyAPI/v6/internal/translator/openai/openai/responses"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers"
+	. "github.com/router-for-me/CLIProxyAPI/v7/internal/constant"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/interfaces"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
+	"github.com/router-for-me/CLIProxyAPI/v7/sdk/api/handlers"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -46,7 +46,10 @@ func writeResponsesSSEChunk(w io.Writer, chunk []byte) {
 }
 
 type responsesSSEFramer struct {
-	pending []byte
+	pending              []byte
+	outputItems          map[int][]byte
+	outputOrder          []int
+	unindexedOutputItems [][]byte
 }
 
 func (f *responsesSSEFramer) WriteChunk(w io.Writer, chunk []byte) {
@@ -62,7 +65,7 @@ func (f *responsesSSEFramer) WriteChunk(w io.Writer, chunk []byte) {
 		if frameLen == 0 {
 			break
 		}
-		writeResponsesSSEChunk(w, f.pending[:frameLen])
+		f.writeFrame(w, f.pending[:frameLen])
 		copy(f.pending, f.pending[frameLen:])
 		f.pending = f.pending[:len(f.pending)-frameLen]
 	}
@@ -73,7 +76,7 @@ func (f *responsesSSEFramer) WriteChunk(w io.Writer, chunk []byte) {
 	if len(f.pending) == 0 || !responsesSSECanEmitWithoutDelimiter(f.pending) {
 		return
 	}
-	writeResponsesSSEChunk(w, f.pending)
+	f.writeFrame(w, f.pending)
 	f.pending = f.pending[:0]
 }
 
@@ -89,8 +92,131 @@ func (f *responsesSSEFramer) Flush(w io.Writer) {
 		f.pending = f.pending[:0]
 		return
 	}
-	writeResponsesSSEChunk(w, f.pending)
+	f.writeFrame(w, f.pending)
 	f.pending = f.pending[:0]
+}
+
+func (f *responsesSSEFramer) writeFrame(w io.Writer, frame []byte) {
+	writeResponsesSSEChunk(w, f.repairFrame(frame))
+}
+
+func (f *responsesSSEFramer) repairFrame(frame []byte) []byte {
+	payload, ok := responsesSSEDataPayload(frame)
+	if !ok || len(payload) == 0 || bytes.Equal(payload, []byte("[DONE]")) || !json.Valid(payload) {
+		return frame
+	}
+
+	switch gjson.GetBytes(payload, "type").String() {
+	case "response.output_item.done":
+		f.recordOutputItem(payload)
+	case "response.completed":
+		repaired := f.repairCompletedPayload(payload)
+		if !bytes.Equal(repaired, payload) {
+			return responsesSSEFrameWithData(frame, repaired)
+		}
+	}
+	return frame
+}
+
+func responsesSSEDataPayload(frame []byte) ([]byte, bool) {
+	var payload []byte
+	found := false
+	for _, line := range bytes.Split(frame, []byte("\n")) {
+		line = bytes.TrimRight(line, "\r")
+		trimmed := bytes.TrimSpace(line)
+		if !bytes.HasPrefix(trimmed, []byte("data:")) {
+			continue
+		}
+		data := bytes.TrimSpace(trimmed[len("data:"):])
+		if found {
+			payload = append(payload, '\n')
+		}
+		payload = append(payload, data...)
+		found = true
+	}
+	return payload, found
+}
+
+func responsesSSEFrameWithData(frame, payload []byte) []byte {
+	var out bytes.Buffer
+	for _, line := range bytes.Split(frame, []byte("\n")) {
+		line = bytes.TrimRight(line, "\r")
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 || bytes.HasPrefix(trimmed, []byte("data:")) {
+			continue
+		}
+		out.Write(line)
+		out.WriteByte('\n')
+	}
+	for _, line := range bytes.Split(payload, []byte("\n")) {
+		out.WriteString("data: ")
+		out.Write(line)
+		out.WriteByte('\n')
+	}
+	out.WriteByte('\n')
+	return out.Bytes()
+}
+
+func (f *responsesSSEFramer) recordOutputItem(payload []byte) {
+	item := gjson.GetBytes(payload, "item")
+	if !item.Exists() || !item.IsObject() || item.Get("type").String() == "" {
+		return
+	}
+
+	if outputIndex := gjson.GetBytes(payload, "output_index"); outputIndex.Exists() {
+		index := int(outputIndex.Int())
+		if f.outputItems == nil {
+			f.outputItems = make(map[int][]byte)
+		}
+		if _, exists := f.outputItems[index]; !exists {
+			f.outputOrder = append(f.outputOrder, index)
+		}
+		f.outputItems[index] = append([]byte(nil), item.Raw...)
+		return
+	}
+
+	f.unindexedOutputItems = append(f.unindexedOutputItems, append([]byte(nil), item.Raw...))
+}
+
+func (f *responsesSSEFramer) repairCompletedPayload(payload []byte) []byte {
+	if len(f.outputOrder) == 0 && len(f.unindexedOutputItems) == 0 {
+		return payload
+	}
+	output := gjson.GetBytes(payload, "response.output")
+	if output.Exists() && (!output.IsArray() || len(output.Array()) > 0) {
+		return payload
+	}
+
+	var outputJSON bytes.Buffer
+	outputJSON.WriteByte('[')
+	indexes := append([]int(nil), f.outputOrder...)
+	sort.Ints(indexes)
+	written := 0
+	for _, index := range indexes {
+		item, ok := f.outputItems[index]
+		if !ok {
+			continue
+		}
+		if written > 0 {
+			outputJSON.WriteByte(',')
+		}
+		outputJSON.Write(item)
+		written++
+	}
+	for _, item := range f.unindexedOutputItems {
+		if written > 0 {
+			outputJSON.WriteByte(',')
+		}
+		outputJSON.Write(item)
+		written++
+	}
+	outputJSON.WriteByte(']')
+
+	repaired, err := sjson.SetRawBytes(payload, "response.output", outputJSON.Bytes())
+	if err != nil {
+		return payload
+	}
+	return repaired
 }
 
 func responsesSSEFrameLen(chunk []byte) int {
@@ -258,21 +384,7 @@ func (h *OpenAIResponsesAPIHandler) Responses(c *gin.Context) {
 
 	// Check if the client requested a streaming response.
 	streamResult := gjson.GetBytes(rawJSON, "stream")
-	stream := streamResult.Type == gjson.True
-
-	modelName := gjson.GetBytes(rawJSON, "model").String()
-	if overrideEndpoint, ok := resolveEndpointOverride(modelName, openAIResponsesEndpoint); ok && overrideEndpoint == openAIChatEndpoint {
-		chatJSON := responsesconverter.ConvertOpenAIResponsesRequestToOpenAIChatCompletions(modelName, rawJSON, stream)
-		stream = gjson.GetBytes(chatJSON, "stream").Bool()
-		if stream {
-			h.handleStreamingResponseViaChat(c, rawJSON, chatJSON)
-		} else {
-			h.handleNonStreamingResponseViaChat(c, rawJSON, chatJSON)
-		}
-		return
-	}
-
-	if stream {
+	if streamResult.Type == gjson.True {
 		h.handleStreamingResponse(c, rawJSON)
 	} else {
 		h.handleNonStreamingResponse(c, rawJSON)
@@ -347,32 +459,6 @@ func (h *OpenAIResponsesAPIHandler) handleNonStreamingResponse(c *gin.Context, r
 	}
 	handlers.WriteUpstreamHeaders(c.Writer.Header(), upstreamHeaders)
 	_, _ = c.Writer.Write(resp)
-	cliCancel()
-}
-
-func (h *OpenAIResponsesAPIHandler) handleNonStreamingResponseViaChat(c *gin.Context, originalResponsesJSON, chatJSON []byte) {
-	c.Header("Content-Type", "application/json")
-
-	modelName := gjson.GetBytes(chatJSON, "model").String()
-	cliCtx, cliCancel := h.GetContextWithCancel(h, c, context.Background())
-	resp, upstreamHeaders, errMsg := h.ExecuteWithAuthManager(cliCtx, OpenAI, modelName, chatJSON, "")
-	if errMsg != nil {
-		h.WriteErrorResponse(c, errMsg)
-		cliCancel(errMsg.Error)
-		return
-	}
-	handlers.WriteUpstreamHeaders(c.Writer.Header(), upstreamHeaders)
-	var param any
-	converted := responsesconverter.ConvertOpenAIChatCompletionsResponseToOpenAIResponsesNonStream(cliCtx, modelName, originalResponsesJSON, originalResponsesJSON, resp, &param)
-	if len(converted) == 0 {
-		h.WriteErrorResponse(c, &interfaces.ErrorMessage{
-			StatusCode: http.StatusInternalServerError,
-			Error:      fmt.Errorf("failed to convert chat completion response to responses format"),
-		})
-		cliCancel(fmt.Errorf("response conversion failed"))
-		return
-	}
-	_, _ = c.Writer.Write(converted)
 	cliCancel()
 }
 
@@ -453,118 +539,6 @@ func (h *OpenAIResponsesAPIHandler) handleStreamingResponse(c *gin.Context, rawJ
 			return
 		}
 	}
-}
-
-func (h *OpenAIResponsesAPIHandler) handleStreamingResponseViaChat(c *gin.Context, originalResponsesJSON, chatJSON []byte) {
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, handlers.ErrorResponse{
-			Error: handlers.ErrorDetail{
-				Message: "Streaming not supported",
-				Type:    "server_error",
-			},
-		})
-		return
-	}
-
-	modelName := gjson.GetBytes(chatJSON, "model").String()
-	cliCtx, cliCancel := h.GetContextWithCancel(h, c, context.Background())
-	dataChan, upstreamHeaders, errChan := h.ExecuteStreamWithAuthManager(cliCtx, OpenAI, modelName, chatJSON, "")
-	var param any
-
-	setSSEHeaders := func() {
-		c.Header("Content-Type", "text/event-stream")
-		c.Header("Cache-Control", "no-cache")
-		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
-	}
-
-	for {
-		select {
-		case <-c.Request.Context().Done():
-			cliCancel(c.Request.Context().Err())
-			return
-		case errMsg, ok := <-errChan:
-			if !ok {
-				errChan = nil
-				continue
-			}
-			h.WriteErrorResponse(c, errMsg)
-			if errMsg != nil {
-				cliCancel(errMsg.Error)
-			} else {
-				cliCancel(nil)
-			}
-			return
-		case chunk, ok := <-dataChan:
-			if !ok {
-				setSSEHeaders()
-				handlers.WriteUpstreamHeaders(c.Writer.Header(), upstreamHeaders)
-				_, _ = c.Writer.Write([]byte("\n"))
-				flusher.Flush()
-				cliCancel(nil)
-				return
-			}
-
-			setSSEHeaders()
-			handlers.WriteUpstreamHeaders(c.Writer.Header(), upstreamHeaders)
-			writeChatAsResponsesChunk(c, cliCtx, modelName, originalResponsesJSON, chunk, &param)
-			flusher.Flush()
-
-			h.forwardChatAsResponsesStream(c, flusher, func(err error) { cliCancel(err) }, dataChan, errChan, cliCtx, modelName, originalResponsesJSON, &param)
-			return
-		}
-	}
-}
-
-func writeChatAsResponsesChunk(c *gin.Context, ctx context.Context, modelName string, originalResponsesJSON, chunk []byte, param *any) {
-	outputs := responsesconverter.ConvertOpenAIChatCompletionsResponseToOpenAIResponses(ctx, modelName, originalResponsesJSON, originalResponsesJSON, chunk, param)
-	for _, out := range outputs {
-		if len(out) == 0 {
-			continue
-		}
-		if bytes.HasPrefix(out, []byte("event:")) {
-			_, _ = c.Writer.Write([]byte("\n"))
-		}
-		_, _ = c.Writer.Write(out)
-		_, _ = c.Writer.Write([]byte("\n"))
-	}
-}
-
-func (h *OpenAIResponsesAPIHandler) forwardChatAsResponsesStream(c *gin.Context, flusher http.Flusher, cancel func(error), data <-chan []byte, errs <-chan *interfaces.ErrorMessage, ctx context.Context, modelName string, originalResponsesJSON []byte, param *any) {
-	h.ForwardStream(c, flusher, cancel, data, errs, handlers.StreamForwardOptions{
-		WriteChunk: func(chunk []byte) {
-			outputs := responsesconverter.ConvertOpenAIChatCompletionsResponseToOpenAIResponses(ctx, modelName, originalResponsesJSON, originalResponsesJSON, chunk, param)
-			for _, out := range outputs {
-				if len(out) == 0 {
-					continue
-				}
-				if bytes.HasPrefix(out, []byte("event:")) {
-					_, _ = c.Writer.Write([]byte("\n"))
-				}
-				_, _ = c.Writer.Write(out)
-				_, _ = c.Writer.Write([]byte("\n"))
-			}
-		},
-		WriteTerminalError: func(errMsg *interfaces.ErrorMessage) {
-			if errMsg == nil {
-				return
-			}
-			status := http.StatusInternalServerError
-			if errMsg.StatusCode > 0 {
-				status = errMsg.StatusCode
-			}
-			errText := http.StatusText(status)
-			if errMsg.Error != nil && errMsg.Error.Error() != "" {
-				errText = errMsg.Error.Error()
-			}
-			body := handlers.BuildErrorResponseBody(status, errText)
-			_, _ = fmt.Fprintf(c.Writer, "\nevent: error\ndata: %s\n\n", string(body))
-		},
-		WriteDone: func() {
-			_, _ = c.Writer.Write([]byte("\n"))
-		},
-	})
 }
 
 func (h *OpenAIResponsesAPIHandler) forwardResponsesStream(c *gin.Context, flusher http.Flusher, cancel func(error), data <-chan []byte, errs <-chan *interfaces.ErrorMessage, framer *responsesSSEFramer) {
