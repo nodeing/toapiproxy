@@ -457,7 +457,11 @@ mod tests {
 
         assert!(header_text.contains("Content-Length: "));
         assert!(body_text.starts_with('{'));
-        assert!(body_text.contains("\"thinking\":{\"budget_tokens\":2048,\"type\":\"enabled\"}"));
+
+        let body_json: serde_json::Value =
+            serde_json::from_str(body_text).expect("body should remain valid json");
+        assert_eq!(body_json["thinking"]["budget_tokens"], 2048);
+        assert_eq!(body_json["thinking"]["type"], "enabled");
     }
 }
 

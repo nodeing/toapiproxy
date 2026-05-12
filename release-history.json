@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "version": "0.1.1",
+    "releasedAt": "2026-05-11T15:29:45+08:00",
+    "releaseMode": "manual",
+    "channel": "local",
+    "tag": "v0.1.1",
+    "installer": "build/dist/ToAPI_Proxy_0.1.1_macos_apple_silicon.dmg",
+    "sha256": "24082e7f73f77e5cb831488cca0eec7068cc30eeb679ac0507ae933035831f24"
+  }
+]

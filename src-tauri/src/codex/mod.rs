@@ -799,12 +799,23 @@ fn parse_auth_dir_from_config(config_path: &Path) -> Result<Option<PathBuf>, Str
 
     let raw = captures
         .get(1)
-        .or_else(|| captures.get(2))
-        .or_else(|| captures.get(3))
-        .map(|value| value.as_str().trim())
+        .map(|value| unescape_double_quoted_yaml_scalar(value.as_str()))
+        .or_else(|| {
+            captures
+                .get(2)
+                .map(|value| value.as_str().replace("''", "'"))
+        })
+        .or_else(|| {
+            captures
+                .get(3)
+                .map(|value| value.as_str().trim().to_string())
+        })
+        .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
 
-    Ok(raw.map(|value| resolve_config_path_value(value, config_path)))
+    Ok(raw
+        .as_deref()
+        .map(|value| resolve_config_path_value(value, config_path)))
 }
 
 fn default_backend_auth_dir() -> Result<PathBuf, String> {
@@ -822,7 +833,7 @@ fn resolve_config_path_value(raw_value: &str, config_path: &Path) -> PathBuf {
     }
 
     let candidate = PathBuf::from(trimmed);
-    if candidate.is_absolute() {
+    if candidate.is_absolute() || is_windows_absolute_path(trimmed) {
         return candidate;
     }
 
@@ -830,6 +841,43 @@ fn resolve_config_path_value(raw_value: &str, config_path: &Path) -> PathBuf {
         .parent()
         .map(|parent| parent.join(&candidate))
         .unwrap_or(candidate)
+}
+
+fn unescape_double_quoted_yaml_scalar(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut chars = value.chars();
+
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            output.push(ch);
+            continue;
+        }
+
+        match chars.next() {
+            Some('\\') => output.push('\\'),
+            Some('"') => output.push('"'),
+            Some('n') => output.push('\n'),
+            Some('r') => output.push('\r'),
+            Some('t') => output.push('\t'),
+            Some(next) => {
+                output.push('\\');
+                output.push(next);
+            }
+            None => output.push('\\'),
+        }
+    }
+
+    output
+}
+
+fn is_windows_absolute_path(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let has_drive_root = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/');
+
+    has_drive_root || value.starts_with(r"\\")
 }
 
 fn is_json_file(path: &Path) -> bool {

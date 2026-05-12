@@ -134,7 +134,11 @@
                 <div class="card">
                     <div class="card-header">
                         <h3>服务日志</h3>
-                        <button id="clear-logs" class="btn btn-small">清空</button>
+                        <div class="card-actions">
+                            <button id="copy-diagnostic-report" class="btn btn-small btn-secondary">复制错误报告</button>
+                            <button id="open-log-folder" class="btn btn-small btn-secondary">打开日志目录</button>
+                            <button id="clear-logs" class="btn btn-small">清空</button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div id="log-container" class="log-container">
@@ -248,16 +252,20 @@
                 <div class="about-content">
                     <img src="assets/logo.svg" alt="TOAPIPROXY" class="about-logo">
                     <h2>ToAPI Proxy</h2>
-                    <p class="version">v0.1.0</p>
-                    <p class="description">一个本地AI API代理服务 仅供个人学习使用</p>
-                    <p class="copyright">&copy; 2026 ToAPI Proxy</p>
-                        <p class="about-link-row">
-                            <a
-                                id="about-tutorial-link"
-                                class="about-link"
-                                href="https://bokecity.com/book/95?from=free"
-                            >使用教程</a>
-                        </p>
+                    <p class="version">v0.1.1</p>
+                    <p class="description">本项目全程由AI编写完成，仅供个人学习研究</p>
+                    <p class="copyright">
+                        &copy; 2026 ToAPI Proxy
+                        <a id="about-home-link" class="about-site-link" href="https://bokecity.com">https://bokecity.com</a>;
+                    </p>
+                    <p class="about-link-row">
+                        <span class="about-learning-text">学习AI编程，上僰(bó)课学城；</span>
+                        <a
+                            id="about-tutorial-link"
+                            class="about-link"
+                            href="https://bokecity.com/book/95?from=free"
+                        >使用教程</a>
+                    </p>
                 </div>
             </section>
         </main>

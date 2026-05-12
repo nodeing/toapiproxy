@@ -657,6 +657,14 @@ h2 {
     font-weight: 650;
 }
 
+.card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .port-info {
     font-size: 12px;
     color: var(--text-secondary);
@@ -1057,6 +1065,16 @@ h2 {
     color: var(--text-secondary);
 }
 
+.about-site-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.about-site-link:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
 .disclaimer {
     font-size: 11px;
     color: var(--text-secondary);
@@ -1066,16 +1084,23 @@ h2 {
 
 .about-link-row {
     margin-top: 16px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.about-learning-text {
+    color: var(--text-secondary);
 }
 
 .about-link {
-    color: var(--accent);
+    color: #f0f3f2;
     text-decoration: none;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .about-link:hover {
+    color: #ffffff;
     text-decoration: underline;
 }
 

@@ -1,27 +1,38 @@
 // Tauri API
 let invoke;
+let invokeBase;
 let listen;
+const pendingDiagnosticLogs = [];
+const diagnosticCommandSkipList = new Set([
+    'record_frontend_log',
+    'copy_diagnostic_report',
+    'open_log_folder',
+]);
 
 async function initTauri() {
     // 等待 Tauri API 加载，最多等待 5 秒
     for (let i = 0; i < 50; i++) {
         if (window.__TAURI__) {
             console.log('Tauri object found:', Object.keys(window.__TAURI__));
+            let detectedInvoke = null;
             // Tauri 2.x API 结构
             if (window.__TAURI__.core) {
-                invoke = window.__TAURI__.core.invoke;
+                detectedInvoke = window.__TAURI__.core.invoke;
             } else if (window.__TAURI__.tauri) {
-                invoke = window.__TAURI__.tauri.invoke;
+                detectedInvoke = window.__TAURI__.tauri.invoke;
             } else if (window.__TAURI__.invoke) {
-                invoke = window.__TAURI__.invoke;
+                detectedInvoke = window.__TAURI__.invoke;
             }
             
             if (window.__TAURI__.event) {
                 listen = window.__TAURI__.event.listen;
             }
             
-            if (invoke) {
+            if (detectedInvoke) {
+                invokeBase = detectedInvoke;
+                invoke = createDiagnosticInvoke(detectedInvoke);
                 console.log('Tauri API initialized successfully');
+                flushDiagnosticLogs();
                 return true;
             }
         }
@@ -219,6 +230,122 @@ function updateServerStatus() {
 }
 
 // Logging
+function normalizeClientError(error) {
+    if (!error) return '未知错误';
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) {
+        return error.stack || error.message || String(error);
+    }
+    try {
+        return JSON.stringify(error);
+    } catch (_) {
+        return String(error);
+    }
+}
+
+function normalizeConsoleValue(value) {
+    if (value instanceof Error) {
+        return value.stack || value.message || String(value);
+    }
+    if (typeof value === 'string') {
+        return value;
+    }
+    try {
+        return JSON.stringify(value);
+    } catch (_) {
+        return String(value);
+    }
+}
+
+function createDiagnosticInvoke(rawInvoke) {
+    return async (cmd, args) => {
+        try {
+            return await rawInvoke(cmd, args);
+        } catch (error) {
+            if (!diagnosticCommandSkipList.has(cmd)) {
+                recordClientDiagnostic(
+                    'error',
+                    `Tauri command failed: ${cmd}\n${normalizeClientError(error)}`,
+                    'tauri.invoke'
+                );
+            }
+            throw error;
+        }
+    };
+}
+
+function recordClientDiagnostic(level, message, context = 'frontend') {
+    const payload = {
+        level,
+        message: String(message || '').slice(0, 6000),
+        context,
+    };
+
+    if (!invokeBase) {
+        pendingDiagnosticLogs.push(payload);
+        if (pendingDiagnosticLogs.length > 50) {
+            pendingDiagnosticLogs.shift();
+        }
+        return;
+    }
+
+    invokeBase('record_frontend_log', payload).catch(() => {
+        pendingDiagnosticLogs.push(payload);
+        if (pendingDiagnosticLogs.length > 50) {
+            pendingDiagnosticLogs.shift();
+        }
+    });
+}
+
+function flushDiagnosticLogs() {
+    if (!invokeBase || pendingDiagnosticLogs.length === 0) {
+        return;
+    }
+
+    const pending = pendingDiagnosticLogs.splice(0, pendingDiagnosticLogs.length);
+    pending.forEach(payload => {
+        invokeBase('record_frontend_log', payload).catch(() => {
+            pendingDiagnosticLogs.push(payload);
+        });
+    });
+}
+
+function setupClientDiagnostics() {
+    if (window.__toapiDiagnosticsReady) {
+        return;
+    }
+    window.__toapiDiagnosticsReady = true;
+
+    window.addEventListener('error', event => {
+        const details = [
+            event.message || '页面脚本错误',
+            event.filename ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}` : '',
+            event.error ? normalizeClientError(event.error) : '',
+        ].filter(Boolean).join('\n');
+        recordClientDiagnostic('error', details, 'window.error');
+        addLog(`页面错误: ${event.message || '未知错误'}`);
+    });
+
+    window.addEventListener('unhandledrejection', event => {
+        const details = normalizeClientError(event.reason);
+        recordClientDiagnostic('error', details, 'unhandledrejection');
+        addLog(`异步错误: ${String(details).split('\n')[0] || '未知错误'}`);
+    });
+
+    const originalError = console.error.bind(console);
+    const originalWarn = console.warn.bind(console);
+
+    console.error = (...args) => {
+        originalError(...args);
+        recordClientDiagnostic('error', args.map(normalizeConsoleValue).join(' '), 'console.error');
+    };
+
+    console.warn = (...args) => {
+        originalWarn(...args);
+        recordClientDiagnostic('warn', args.map(normalizeConsoleValue).join(' '), 'console.warn');
+    };
+}
+
 function addLog(message) {
     const timestamp = new Date().toLocaleTimeString();
     logs.push(`[${timestamp}] ${message}`);
@@ -312,6 +439,35 @@ document.getElementById('clear-logs').addEventListener('click', () => {
     logs = [];
     renderLogs();
     if (invoke) invoke('clear_server_logs');
+});
+
+document.getElementById('copy-diagnostic-report')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '复制中...';
+
+    try {
+        const result = await invoke('copy_diagnostic_report');
+        addLog(`已复制错误报告，共 ${result.lineCount || 0} 行`);
+        showNotification('错误报告已复制', result.logDir || '日志信息已复制到剪贴板');
+    } catch (error) {
+        addLog(`复制错误报告失败: ${error}`);
+        alert(`复制错误报告失败: ${error}`);
+    } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+    }
+});
+
+document.getElementById('open-log-folder')?.addEventListener('click', async () => {
+    try {
+        await invoke('open_log_folder');
+        addLog('已打开日志目录');
+    } catch (error) {
+        addLog(`打开日志目录失败: ${error}`);
+        alert(`打开日志目录失败: ${error}`);
+    }
 });
 
 
@@ -1233,8 +1389,24 @@ function setupAutostart() {
 
 // Notification helper
 function showNotification(title, body) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body });
+    try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(title, { body });
+        }
+    } catch (_) {
+        // Notifications are optional; failures should not interrupt the app.
+    }
+}
+
+async function setupNotificationPermission() {
+    if (!('Notification' in window) || Notification.permission !== 'default') {
+        return;
+    }
+
+    try {
+        await Notification.requestPermission();
+    } catch (_) {
+        // Notifications are optional; missing permission should not appear as an app error.
     }
 }
 
@@ -1266,15 +1438,12 @@ async function openExternalUrl(url) {
 }
 
 function setupAboutLinks() {
-    const tutorialLink = document.getElementById('about-tutorial-link');
-    if (!tutorialLink) {
-        return;
-    }
-
-    tutorialLink.addEventListener('click', async event => {
-        event.preventDefault();
-        event.stopPropagation();
-        await openExternalUrl(tutorialLink.href);
+    document.querySelectorAll('#about-tutorial-link, #about-home-link').forEach(link => {
+        link.addEventListener('click', async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            await openExternalUrl(link.href);
+        });
     });
 }
 
@@ -1322,14 +1491,10 @@ async function setupFileWatcher() {
 async function init() {
     addLog('正在初始化...');
     
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-    
     try {
         setupAboutLinks();
         setupAutostart();
+        await setupNotificationPermission();
         await refreshState();
         await setupFileWatcher();
         await loadCodexKeys();
@@ -1354,13 +1519,15 @@ async function init() {
 
 // Start app
 document.addEventListener('DOMContentLoaded', async () => {
+    setupClientDiagnostics();
     const tauriReady = await initTauri();
     if (!tauriReady) {
         console.warn('Tauri not available');
-        invoke = (cmd, args) => {
+        invokeBase = (cmd, args) => {
             console.log('Mock invoke:', cmd, args);
             return Promise.resolve({ serverRunning: false, accounts: [], services: [], logs: [] });
         };
+        invoke = createDiagnosticInvoke(invokeBase);
     }
     
     await init();

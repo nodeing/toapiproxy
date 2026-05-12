@@ -24,6 +24,8 @@ codex-config-profiles.json
 claude-config-profiles.json
 backend-usage.json
 usage-statistics/
+*.log
+logs/
 
 # Build outputs
 build/

@@ -22,6 +22,7 @@ use tauri::{
     Manager, WindowEvent,
 };
 use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 fn runtime_config_file_name() -> &'static str {
     if cfg!(debug_assertions) {
@@ -177,6 +178,9 @@ pub fn run() {
             commands::open_external_url,
             commands::get_server_logs,
             commands::clear_server_logs,
+            commands::record_frontend_log,
+            commands::copy_diagnostic_report,
+            commands::open_log_folder,
             commands::start_file_watcher,
             commands::stop_file_watcher,
             commands::copy_server_url,
@@ -219,13 +223,21 @@ pub fn run() {
                 app.set_dock_visibility(false);
             }
 
+            let mut log_builder = tauri_plugin_log::Builder::default()
+                .clear_targets()
+                .level(log::LevelFilter::Info)
+                .timezone_strategy(TimezoneStrategy::UseLocal)
+                .rotation_strategy(RotationStrategy::KeepSome(5))
+                .max_file_size(1024 * 1024)
+                .target(Target::new(TargetKind::LogDir {
+                    file_name: Some("toapiproxy".into()),
+                }));
+
             if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+                log_builder = log_builder.target(Target::new(TargetKind::Stdout));
             }
+
+            app.handle().plugin(log_builder.build())?;
 
             let state = app.state::<AppState>();
 

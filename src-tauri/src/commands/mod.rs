@@ -27,8 +27,14 @@ use crate::server::{AuthResult, ProxyServer};
 use crate::thinking_proxy::ThinkingProxy;
 use crate::usage::UsageClient;
 use crate::watcher::AuthFileWatcher;
+use regex::Regex;
 use serde::Serialize;
-use std::sync::Mutex;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Mutex,
+    time::SystemTime,
+};
 use tauri::{Manager, State};
 
 // App State
@@ -242,10 +248,11 @@ pub fn connect_service(
     service_id: String,
     qwen_email: Option<String>,
 ) -> Result<AuthResult, String> {
+    let qwen_email_log = qwen_email.as_deref().map(mask_secret_tail);
     log::info!(
         "Connecting to service: {}, email: {:?}",
         service_id,
-        qwen_email
+        qwen_email_log
     );
     state
         .server
@@ -254,7 +261,7 @@ pub fn connect_service(
 
 #[tauri::command]
 pub fn disconnect_service(state: State<AppState>, account_id: String) -> Result<String, String> {
-    log::info!("Disconnecting account: {}", account_id);
+    log::info!("Disconnecting account: {}", mask_secret_tail(&account_id));
 
     let mut auth_manager = state.auth_manager.lock().unwrap();
     auth_manager.remove_account(&account_id)?;
@@ -274,7 +281,10 @@ pub async fn fetch_usage(
     state: State<'_, AppState>,
     account_id: String,
 ) -> Result<UsageResponse, String> {
-    log::info!("Fetching usage for account: {}", account_id);
+    log::info!(
+        "Fetching usage for account: {}",
+        mask_secret_tail(&account_id)
+    );
 
     // 获取最新的 token
     let token = {
@@ -425,6 +435,282 @@ pub fn clear_server_logs(state: State<AppState>) {
     state.server.clear_logs();
 }
 
+#[derive(Serialize)]
+pub struct DiagnosticReportResponse {
+    #[serde(rename = "logDir")]
+    pub log_dir: String,
+    #[serde(rename = "lineCount")]
+    pub line_count: usize,
+}
+
+#[tauri::command]
+pub fn record_frontend_log(
+    level: String,
+    message: String,
+    context: Option<String>,
+) -> Result<(), String> {
+    let context = context
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "frontend".to_string());
+    let message = truncate_text(&redact_sensitive(&message), 4000);
+
+    match level.trim().to_ascii_lowercase().as_str() {
+        "error" => log::error!(target: "frontend", "[{}] {}", context, message),
+        "warn" | "warning" => log::warn!(target: "frontend", "[{}] {}", context, message),
+        _ => log::info!(target: "frontend", "[{}] {}", context, message),
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_log_folder(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let log_dir = resolve_log_dir(&app_handle)?;
+    fs::create_dir_all(&log_dir).map_err(|error| format!("创建日志目录失败: {}", error))?;
+    open_folder(&log_dir)
+}
+
+#[tauri::command]
+pub fn copy_diagnostic_report(
+    state: State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<DiagnosticReportResponse, String> {
+    let log_dir = resolve_log_dir(&app_handle)?;
+    let report = build_diagnostic_report(state.inner(), &app_handle, &log_dir)?;
+    let line_count = report.lines().count();
+
+    let mut clipboard = arboard::Clipboard::new().map_err(|error| {
+        format!(
+            "无法访问剪贴板，请打开日志目录后手动发送日志文件: {}",
+            error
+        )
+    })?;
+    clipboard
+        .set_text(report)
+        .map_err(|error| format!("写入剪贴板失败: {}", error))?;
+
+    Ok(DiagnosticReportResponse {
+        log_dir: display_path(&log_dir),
+        line_count,
+    })
+}
+
+fn build_diagnostic_report(
+    state: &AppState,
+    app_handle: &tauri::AppHandle,
+    log_dir: &Path,
+) -> Result<String, String> {
+    let package_info = app_handle.package_info();
+    let server_running = *state
+        .server_running
+        .lock()
+        .map_err(|error| error.to_string())?;
+    let server_logs = state.server.get_logs();
+    let log_files = collect_log_files(log_dir);
+
+    let mut report = String::new();
+    report.push_str("# TOAPIPROXY 错误报告\n\n");
+    report.push_str("## 基本信息\n");
+    report.push_str(&format!(
+        "- 生成时间: {}\n",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S %z")
+    ));
+    report.push_str(&format!("- 应用版本: {}\n", package_info.version));
+    report.push_str(&format!(
+        "- 系统: {} {}\n",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
+    report.push_str(&format!(
+        "- 代理状态: {}\n",
+        if server_running {
+            "运行中"
+        } else {
+            "已停止"
+        }
+    ));
+    report.push_str(&format!("- 代理端口: {}\n", state.server.proxy_port()));
+    report.push_str(&format!("- 后端端口: {}\n", state.server.backend_port()));
+    report.push_str(&format!("- 日志目录: {}\n", display_path(log_dir)));
+
+    report.push_str("\n## 日志文件\n");
+    if log_files.is_empty() {
+        report.push_str("- 未找到日志文件\n");
+    } else {
+        for path in log_files.iter().take(8) {
+            let size = fs::metadata(path)
+                .map(|metadata| metadata.len())
+                .unwrap_or(0);
+            report.push_str(&format!(
+                "- {} ({} bytes)\n",
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("unknown.log"),
+                size
+            ));
+        }
+    }
+
+    report.push_str("\n## 界面服务日志\n");
+    if server_logs.is_empty() {
+        report.push_str("暂无\n");
+    } else {
+        let start = server_logs.len().saturating_sub(80);
+        for line in &server_logs[start..] {
+            report.push_str(&redact_sensitive(line));
+            report.push('\n');
+        }
+    }
+
+    report.push_str("\n## 最新应用日志\n");
+    if let Some(latest_log) = log_files.first() {
+        if let Some(contents) = read_tail_text(latest_log, 80 * 1024) {
+            report.push_str(&redact_sensitive(&contents));
+            if !contents.ends_with('\n') {
+                report.push('\n');
+            }
+        } else {
+            report.push_str("无法读取最新日志文件\n");
+        }
+    } else {
+        report.push_str("暂无\n");
+    }
+
+    Ok(report)
+}
+
+fn resolve_log_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|error| format!("获取日志目录失败: {}", error))
+}
+
+fn collect_log_files(log_dir: &Path) -> Vec<PathBuf> {
+    let mut files = fs::read_dir(log_dir)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("log"))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    files.sort_by(|left, right| modified_at(right).cmp(&modified_at(left)));
+    files
+}
+
+fn modified_at(path: &Path) -> SystemTime {
+    fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .unwrap_or(SystemTime::UNIX_EPOCH)
+}
+
+fn read_tail_text(path: &Path, max_bytes: usize) -> Option<String> {
+    let data = fs::read(path).ok()?;
+    let start = data.len().saturating_sub(max_bytes);
+    Some(String::from_utf8_lossy(&data[start..]).to_string())
+}
+
+fn display_path(path: &Path) -> String {
+    let raw = path.display().to_string();
+    if let Some(home_dir) = dirs::home_dir() {
+        let home = home_dir.display().to_string();
+        if raw == home {
+            return "~".to_string();
+        }
+        if let Some(rest) = raw.strip_prefix(&(home + std::path::MAIN_SEPARATOR_STR)) {
+            return format!("~{}{}", std::path::MAIN_SEPARATOR, rest);
+        }
+    }
+    raw
+}
+
+fn truncate_text(value: &str, max_chars: usize) -> String {
+    let mut truncated = value.chars().take(max_chars).collect::<String>();
+    if value.chars().count() > max_chars {
+        truncated.push_str("\n...[truncated]");
+    }
+    truncated
+}
+
+fn redact_sensitive(value: &str) -> String {
+    let mut redacted = value.to_string();
+    if let Some(home_dir) = dirs::home_dir() {
+        let home = home_dir.display().to_string();
+        redacted = redacted.replace(&home, "~");
+    }
+
+    let key_value_patterns = [
+        r#"(?i)\b(authorization\s*[:=]\s*)bearer\s+[A-Za-z0-9._-]{20,}"#,
+        r#"(?i)\b((api[-_ ]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|password)\s*[:=]\s*)[^\s,"']+"#,
+    ];
+
+    for pattern in key_value_patterns {
+        if let Ok(regex) = Regex::new(pattern) {
+            redacted = regex.replace_all(&redacted, "${1}[REDACTED]").into_owned();
+        }
+    }
+
+    let secret_patterns = [
+        r#"sk-(proj-)?[A-Za-z0-9_-]{20,}"#,
+        r#"sk-ant-[A-Za-z0-9_-]{20,}"#,
+        r#"(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{30,}"#,
+        r#"github_pat_[A-Za-z0-9_]{20,}"#,
+        r#"AIza[0-9A-Za-z_-]{35}"#,
+        r#"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"#,
+        r#"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"#,
+    ];
+
+    for pattern in secret_patterns {
+        if let Ok(regex) = Regex::new(pattern) {
+            redacted = regex.replace_all(&redacted, "[REDACTED]").into_owned();
+        }
+    }
+
+    redacted
+}
+
+fn mask_secret_tail(value: &str) -> String {
+    let tail = value.chars().rev().take(4).collect::<Vec<_>>();
+    if tail.is_empty() {
+        return "[empty]".to_string();
+    }
+
+    let tail = tail.into_iter().rev().collect::<String>();
+    format!("***{}", tail)
+}
+
+fn open_folder(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn start_file_watcher(
     state: State<AppState>,
@@ -550,7 +836,7 @@ pub async fn add_codex_key(api_key: String, base_url: Option<String>) -> Result<
 
 #[tauri::command]
 pub async fn delete_codex_key(api_key: String) -> Result<(), String> {
-    log::info!("Deleting Codex API key: {}", api_key);
+    log::info!("Deleting Codex API key: {}", mask_secret_tail(&api_key));
     let client = CodexClient::new();
     client.delete_codex_key(&api_key).await
 }
@@ -560,7 +846,7 @@ pub async fn delete_codex_account(
     state: State<'_, AppState>,
     account_ref: String,
 ) -> Result<(), String> {
-    log::info!("Deleting Codex account: {}", account_ref);
+    log::info!("Deleting Codex account: {}", mask_secret_tail(&account_ref));
     let client = CodexClient::with_config_path(state.server.config_path());
     client.delete_codex_account(&account_ref).await
 }
