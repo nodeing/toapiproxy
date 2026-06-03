@@ -109,8 +109,7 @@ function Get-CLIProxyAPICommit {
         $subtreeMessage = git -C $RepoRoot log `
             --format=%B `
             -n 1 `
-            --grep "git-subtree-dir: $subtreePath" `
-            --fixed-strings 2>$null
+            --grep "^git-subtree-dir: $subtreePath$" 2>$null
 
         foreach ($line in ($subtreeMessage -split "`r?`n")) {
             if ($line -like "git-subtree-split:*") {

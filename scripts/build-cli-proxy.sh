@@ -75,7 +75,7 @@ resolve_cli_proxy_commit() {
     return 0
   fi
 
-  subtree_message="$(git -C "$repo_root" log --format=%B -n 1 --grep="git-subtree-dir: $subtree_path" --fixed-strings 2>/dev/null || true)"
+  subtree_message="$(git -C "$repo_root" log --format=%B -n 1 --grep="^git-subtree-dir: $subtree_path$" 2>/dev/null || true)"
   split_commit="$(printf '%s\n' "$subtree_message" | awk '/^git-subtree-split:/ { print $2; exit }')"
   if [[ -n "$split_commit" ]]; then
     printf '%.8s' "$split_commit"
