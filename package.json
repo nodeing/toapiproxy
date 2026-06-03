@@ -1,6 +1,6 @@
 {
   "name": "toapiproxy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AI API proxy desktop app built with Tauri",
   "scripts": {
     "dev": "cargo tauri dev",
@@ -9,7 +9,13 @@
     "release": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts\\release.ps1",
     "tauri": "cargo tauri"
   },
-  "keywords": ["tauri", "rust", "proxy", "ai", "api"],
+  "keywords": [
+    "tauri",
+    "rust",
+    "proxy",
+    "ai",
+    "api"
+  ],
   "author": "",
   "license": "MIT"
 }

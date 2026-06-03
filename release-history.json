@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.1.2",
+    "releasedAt": "2026-06-03T16:02:39+08:00",
+    "releaseMode": "auto-patch",
+    "channel": "gitee",
+    "remote": {
+      "name": "origin",
+      "url": "git@gitee.com:nodeing/bokecity-toapiproxy.git"
+    },
+    "branch": "master",
+    "tag": "v0.1.2",
+    "installer": "build/dist/ToAPI_Proxy_0.1.2_macos_apple_silicon.dmg",
+    "sha256": "3e579bcf90cf80e51dd254a71b932eb993a130a0e404192ba9a3c6d93aa4cda4"
+  },
+  {
     "version": "0.1.1",
     "releasedAt": "2026-05-11T15:29:45+08:00",
     "releaseMode": "manual",
